@@ -141,3 +141,41 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# ================================
+# DFS Project-Specific Rules
+# ================================
+
+# SSL/TLS certificates and keys
+*.pem
+*.key
+*.crt
+*.csr
+
+# Uploaded files (user data — never commit)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Downloaded/temp files
+server/downloads/*
+!server/downloads/.gitkeep
+
+# Storage node data (chunk files — never commit)
+server/storage/node1/*
+!server/storage/node1/.gitkeep
+server/storage/node2/*
+!server/storage/node2/.gitkeep
+server/storage/node3/*
+!server/storage/node3/.gitkeep
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / Editor config
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

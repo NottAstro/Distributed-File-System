@@ -5,6 +5,9 @@ const morgan = require('morgan');
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+
 // Create Express app
 const app = express();
 
@@ -39,8 +42,8 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Auth routes (will be mounted in Feature 4)
-// app.use('/api/auth', authRoutes);
+// Authentication routes
+app.use('/api/auth', authRoutes);
 
 // ---------------------
 // 404 Handler

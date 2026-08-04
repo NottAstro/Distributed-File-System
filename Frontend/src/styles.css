@@ -1,0 +1,205 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+/*
+ * DFS design system — dark only.
+ * Palette, typography and effects follow the DFS design spec
+ * (Cofounder-inspired: dark-first, glassmorphic, typographically refined).
+ */
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-elevated: var(--elevated);
+  --color-surface: var(--surface);
+  --color-hover: var(--hover);
+  --color-card: var(--elevated);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--elevated);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--foreground);
+  --color-primary-foreground: var(--background);
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--text-secondary);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent-primary);
+  --color-accent-foreground: var(--background);
+  --color-teal: var(--accent-teal);
+  --color-amber: var(--accent-amber);
+  --color-destructive: var(--accent-red);
+  --color-destructive-foreground: var(--background);
+  --color-border: var(--border-subtle);
+  --color-border-strong: var(--border-interactive);
+  --color-input: var(--border-subtle);
+  --color-ring: var(--border-interactive);
+  --color-glass: var(--glass-bg);
+
+  --ease-soft: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+:root {
+  color-scheme: dark;
+
+  --background: oklch(0.145 0 0); /* #0a0a0a */
+  --elevated: oklch(0.196 0 0); /* #141414 */
+  --surface: oklch(0.221 0 0); /* #1a1a1a */
+  --hover: oklch(1 0 0 / 4%);
+
+  --foreground: oklch(0.985 0.002 106); /* #FBFBF8 */
+  --text-secondary: oklch(1 0 0 / 64%);
+  --text-faint: oklch(1 0 0 / 36%);
+
+  --accent-primary: oklch(0.93 0.235 122); /* #c8ff00 */
+  --accent-teal: oklch(0.782 0.128 182); /* #2dd4bf */
+  --accent-amber: oklch(0.833 0.157 82); /* #fbbf24 */
+  --accent-red: oklch(0.712 0.166 22); /* #f87171 */
+
+  --border-subtle: oklch(1 0 0 / 8%);
+  --border-interactive: oklch(1 0 0 / 16%);
+
+  --glass-bg: oklch(1 0 0 / 6%);
+  --glass-blur: 16px;
+
+  --shadow-panel: 0 24px 80px -24px oklch(0 0 0 / 80%);
+}
+
+@layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: oklch(0.93 0.235 122 / 25%);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-interactive);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@utility glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+@utility text-overline {
+  font-size: 11px;
+  font-weight: 520;
+  letter-spacing: 1.2px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+@utility hero-ink {
+  filter: drop-shadow(0 1px 3px oklch(0 0 0 / 35%));
+}
+
+@utility mesh {
+  background-image:
+    radial-gradient(60% 55% at 18% 8%, oklch(0.93 0.235 122 / 10%) 0%, transparent 60%),
+    radial-gradient(50% 50% at 82% 18%, oklch(0.782 0.128 182 / 9%) 0%, transparent 62%),
+    radial-gradient(70% 60% at 50% 100%, oklch(1 0 0 / 4%) 0%, transparent 70%);
+}
+
+@keyframes dfs-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dfs-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes dfs-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes dfs-shimmer {
+  0% {
+    background-position: -220% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+
+@keyframes dfs-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@utility animate-rise {
+  animation: dfs-rise 400ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@utility animate-slide-in {
+  animation: dfs-slide-in 300ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@utility animate-pulse-dot {
+  animation: dfs-pulse-dot 1.4s ease-in-out infinite;
+}
+
+@utility shimmer-num {
+  background-image: linear-gradient(
+    100deg,
+    var(--foreground) 20%,
+    oklch(0.93 0.235 122 / 85%) 45%,
+    var(--foreground) 70%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: dfs-shimmer 5s linear infinite;
+}

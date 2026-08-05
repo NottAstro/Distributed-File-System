@@ -3,9 +3,9 @@ import { X } from "lucide-react";
 import { Button } from "./Button";
 import { Pill } from "./Logo";
 import { StatusDot } from "./StatusDot";
-import { formatBytes, formatDateTime } from "@/lib/dfs/format";
-import type { DfsFile, DownloadStage } from "@/lib/dfs/types";
-import * as api from "@/lib/dfs/api";
+import { formatBytes, formatDateTime } from "@/lib/core/format";
+import type { DfsFile, DownloadStage } from "@/lib/core/types";
+import * as api from "@/lib/core/api";
 import { toast } from "sonner";
 
 const STAGE_LABEL: Record<Exclude<DownloadStage, "idle">, string> = {
@@ -41,7 +41,13 @@ export function FileDetailPanel({
         onClick={onClose}
         aria-hidden="true"
       />
-      <section className="animate-slide-in relative flex h-full w-full max-w-[440px] flex-col border-l border-border bg-elevated">
+      <section
+        className="animate-slide-in relative flex h-full w-full max-w-[440px] flex-col border-l"
+        style={{
+          background: "rgba(5,6,15,0.97)",
+          borderColor: "rgba(186,215,247,0.08)",
+        }}
+      >
         {stage !== "idle" && (
           <div className="h-1 w-full bg-surface">
             <div

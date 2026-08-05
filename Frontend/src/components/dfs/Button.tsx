@@ -8,20 +8,21 @@ export const dfsButton = cva(
   {
     variants: {
       variant: {
-        primary:
-          "bg-foreground text-background rounded-md hover:brightness-95 hover:scale-[1.02] active:scale-100",
+        primary: "ak-pill-btn",
+        authSubmit: "ak-violet-btn w-full",
         secondary:
-          "glass text-foreground rounded-full border border-border-strong hover:bg-white/12 hover:border-white/25",
-        ghost: "text-muted-foreground hover:text-foreground rounded-md",
+          "text-foreground rounded-full border border-[rgba(186,215,247,0.1)] hover:bg-[rgba(186,214,247,0.06)]",
+        ghost:
+          "text-[var(--ak-moon)] hover:text-white rounded-full hover:bg-[rgba(186,214,247,0.08)]",
         danger:
-          "border border-destructive text-destructive rounded-md bg-transparent hover:bg-destructive/10",
-        accent: "bg-accent text-accent-foreground rounded-md hover:brightness-105",
-        icon: "size-8 rounded-md text-faint hover:text-foreground hover:bg-hover",
+          "border border-destructive text-destructive rounded-full bg-transparent hover:bg-destructive/10",
+        accent: "bg-accent text-accent-foreground rounded-full hover:brightness-105",
+        icon: "size-8 rounded-full text-[var(--ak-moon)] hover:text-white hover:bg-[rgba(186,214,247,0.08)]",
       },
       size: {
         sm: "h-9 px-3 text-[14px]",
-        md: "h-[41px] px-4 text-[15px] tracking-[0.15px]",
-        lg: "h-12 px-5 text-[15px] tracking-[0.15px]",
+        md: "h-[41px]", // padding/font-size is handled by ak-pill-btn mostly, but we can leave this
+        lg: "h-12",
         none: "",
       },
     },

@@ -11,9 +11,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/dfs/AppShell";
 import { Button } from "@/components/dfs/Button";
 import { FileTypeIcon } from "@/components/dfs/Logo";
-import { useDfs } from "@/lib/dfs/store";
-import { formatBytes, formatDateTime } from "@/lib/dfs/format";
-import * as api from "@/lib/dfs/api";
+import { useDfs } from "@/lib/core/store";
+import { formatBytes, formatDateTime } from "@/lib/core/format";
+import * as api from "@/lib/core/api";
 import { toast } from "sonner";
 
 const title = "Downloads — DFS";

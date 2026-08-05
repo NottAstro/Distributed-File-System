@@ -13,9 +13,9 @@ import { AppShell } from "@/components/dfs/AppShell";
 import { Button } from "@/components/dfs/Button";
 import { Field, PasswordField } from "@/components/dfs/Field";
 import { StorageMeter } from "@/components/dfs/StorageMeter";
-import { useDfs } from "@/lib/dfs/store";
-import { initials } from "@/lib/dfs/format";
-import { MOCK_SESSIONS } from "@/lib/dfs/mock-data";
+import { useDfs } from "@/lib/core/store";
+import { initials } from "@/lib/core/format";
+import { MOCK_SESSIONS } from "@/lib/core/mock-data";
 import { toast } from "sonner";
 
 const title = "Settings — DFS";

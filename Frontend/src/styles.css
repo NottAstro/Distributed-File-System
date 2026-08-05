@@ -3,14 +3,17 @@
 @import "tw-animate-css";
 
 /*
- * DFS design system — dark only.
+ * upLoader design system — dark only.
  * Palette, typography and effects follow the DFS design spec
  * (Cofounder-inspired: dark-first, glassmorphic, typographically refined).
+ * AuthKit midnight cathedral tokens are additive — prefixed with --ak-*.
  */
 
 @theme inline {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-eyebrow: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -72,6 +75,28 @@
   --glass-blur: 16px;
 
   --shadow-panel: 0 24px 80px -24px oklch(0 0 0 / 80%);
+
+  /* ── AuthKit Midnight Cathedral Tokens ── */
+  --ak-canvas: #05060f;
+  --ak-steel: #2f343e;
+  --ak-fog: #9da7ba;
+  --ak-moon: #c7d3ea;
+  --ak-frost: #d1e4fa;
+  --ak-ice: #d8ecf8;
+  --ak-white: #ffffff;
+  --ak-violet: #663af3;
+  --ak-blueprint: #b6d9fc;
+  --ak-glass-edge: rgba(186, 215, 247, 0.12);
+  --ak-luminous: rgba(199, 211, 234, 0.12);
+
+  --ak-shadow-card: rgba(216, 236, 248, 0.2) 0px 1px 1px 0px inset,
+    rgba(168, 216, 245, 0.06) 0px 24px 48px 0px inset,
+    rgba(0, 0, 0, 0.3) 0px 16px 32px 0px;
+  --ak-shadow-feature: rgba(199, 211, 234, 0.12) 0px 1px 1px 0px inset,
+    rgba(199, 211, 234, 0.05) 0px 24px 48px 0px inset,
+    rgba(6, 6, 14, 0.7) 0px 24px 32px 0px;
+  --ak-shadow-sm: rgba(186, 207, 247, 0.32) 0px 0px 6px 0px;
+  --ak-shadow-md: rgba(238, 186, 247, 0.24) 0px 0px 12px 0px;
 }
 
 @layer base {
@@ -133,6 +158,92 @@
     radial-gradient(70% 60% at 50% 100%, oklch(1 0 0 / 4%) 0%, transparent 70%);
 }
 
+/* ── AuthKit utilities ── */
+
+@utility ak-grid {
+  background-image:
+    linear-gradient(to right, rgba(186, 215, 247, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(186, 215, 247, 0.06) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 0%, black 30%, transparent 100%);
+}
+
+@utility ak-spotlight {
+  background: conic-gradient(
+    from 90deg at 50% 0%,
+    transparent 45%,
+    rgba(124, 145, 182, 0.3) 49%,
+    rgba(124, 145, 182, 0.5) 50%,
+    rgba(124, 145, 182, 0.3) 51%,
+    transparent 55%
+  );
+}
+
+@utility ak-gradient-text {
+  background: linear-gradient(0deg, #d8ecf8 0%, #98c0ef 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility ak-eyebrow {
+  font-family: "JetBrains Mono", "IBM Plex Mono", monospace;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--ak-moon);
+}
+
+@utility ak-glass-card {
+  background: rgba(5, 6, 15, 0.97);
+  border-radius: 16px;
+  box-shadow: var(--ak-shadow-card);
+}
+
+@utility ak-pill-btn {
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: rgba(186, 214, 247, 0.06);
+  box-shadow: rgba(186, 215, 247, 0.12) 0px 0px 0px 1px inset;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 200ms ease;
+
+  &:hover {
+    background: rgba(186, 214, 247, 0.12);
+  }
+}
+
+@utility ak-violet-btn {
+  background: #663af3;
+  color: #ffffff;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: opacity 200ms ease, transform 100ms ease;
+
+  &:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+}
+
+@utility ak-input {
+  background: rgba(199, 211, 234, 0.06);
+  border-radius: 6px;
+  box-shadow: rgba(186, 215, 247, 0.12) 0px 0px 0px 1px inset;
+  color: #ffffff;
+  transition: box-shadow 200ms ease;
+
+  &:focus {
+    box-shadow: rgba(186, 215, 247, 0.24) 0px 0px 0px 1px inset;
+    outline: none;
+  }
+}
+
+/* ── Keyframes ── */
+
 @keyframes dfs-rise {
   from {
     opacity: 0;
@@ -178,6 +289,32 @@
   }
 }
 
+@keyframes ak-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes ak-float-left {
+  0%, 100% { transform: rotate(-5deg) translateY(0px) scale(0.88); }
+  50% { transform: rotate(-5deg) translateY(-6px) scale(0.88); }
+}
+
+@keyframes ak-float-right {
+  0%, 100% { transform: rotate(5deg) translateY(0px) scale(0.88); }
+  50% { transform: rotate(5deg) translateY(-6px) scale(0.88); }
+}
+
+@keyframes ak-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @utility animate-rise {
   animation: dfs-rise 400ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
@@ -202,4 +339,20 @@
   background-clip: text;
   color: transparent;
   animation: dfs-shimmer 5s linear infinite;
+}
+
+@utility ak-animate-float {
+  animation: ak-float 6s ease-in-out infinite;
+}
+
+@utility ak-animate-float-left {
+  animation: ak-float-left 7s ease-in-out infinite;
+}
+
+@utility ak-animate-float-right {
+  animation: ak-float-right 5.5s ease-in-out infinite;
+}
+
+@utility ak-animate-fade-up {
+  animation: ak-fade-up 600ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }

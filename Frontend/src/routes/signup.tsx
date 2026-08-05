@@ -12,11 +12,11 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/dfs/Logo";
 import { Button } from "@/components/dfs/Button";
 import { Field, PasswordField, PasswordStrength } from "@/components/dfs/Field";
-import { useDfs } from "@/lib/dfs/store";
+import { useDfs } from "@/lib/core/store";
 import { toast } from "sonner";
 
-const title = "Create your DFS account";
-const description = "Sign up for DFS to upload, encrypt and distribute files across storage nodes.";
+const title = "Create your upLoader account";
+const description = "Sign up for upLoader to upload, encrypt and distribute files across storage nodes.";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -44,9 +44,19 @@ function SignUpPage() {
   }, [user, navigate]);
 
   return (
-    <main className="mesh flex min-h-screen items-center justify-center px-6 py-16">
+    <main
+      className="flex min-h-screen items-center justify-center px-6 py-16"
+      style={{
+        background: "#05060f",
+      }}
+    >
+      <div className="ak-grid absolute inset-0 z-0 opacity-50" />
+
       <form
-        className="animate-rise w-full max-w-[420px]"
+        className="ak-glass-card relative z-10 w-full max-w-[420px] p-8"
+        style={{
+          animation: "float 6s ease-in-out infinite",
+        }}
         onSubmit={async (e) => {
           e.preventDefault();
           if (password !== confirm) {
@@ -68,8 +78,8 @@ function SignUpPage() {
           <Link to="/" className="text-foreground">
             <Logo />
           </Link>
-          <h1 className="mt-8 text-[30px] font-normal tracking-[-0.01em]">Create your account</h1>
-          <p className="mt-2 text-[15px] text-muted-foreground">
+          <h1 className="ak-gradient-text mt-8 text-[30px] font-medium tracking-tight">Create your account</h1>
+          <p className="mt-2 text-[15px] text-[var(--ak-moon)]">
             Start distributing files in under a minute
           </p>
         </div>
@@ -109,7 +119,7 @@ function SignUpPage() {
           />
         </div>
 
-        <Button type="submit" size="lg" full className="mt-6" disabled={busy}>
+        <Button variant="authSubmit" type="submit" size="lg" full className="mt-6" disabled={busy}>
           {busy ? "Creating account…" : "Create Account"}
         </Button>
 

@@ -18,7 +18,7 @@ export function Field({ label, hint, className, id, ...props }: FieldProps) {
       <input
         id={inputId}
         className={cn(
-          "h-11 w-full rounded-md border border-border bg-surface px-3 text-[15px] text-foreground placeholder:text-faint transition-colors duration-200 ease-out focus:border-border-strong focus:outline-none disabled:opacity-60",
+          "ak-input h-11 w-full px-3 text-[15px] disabled:opacity-60",
           className,
         )}
         {...props}

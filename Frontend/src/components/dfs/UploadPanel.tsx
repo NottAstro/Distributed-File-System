@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { X, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useDfs } from "@/lib/dfs/store";
+import { useDfs } from "@/lib/core/store";
 import { Button } from "./Button";
 import { FileTypeIcon } from "./Logo";
-import { formatBytes } from "@/lib/dfs/format";
-import type { UploadStage } from "@/lib/dfs/types";
+import { formatBytes } from "@/lib/core/format";
+import type { UploadStage } from "@/lib/core/types";
 
 const STAGE_LABEL: Record<UploadStage, string> = {
   queued: "Ready",
@@ -40,9 +40,13 @@ export function UploadPanel() {
 
       <section
         className={cn(
-          "animate-slide-in relative flex h-full w-full max-w-[480px] flex-col border-l bg-elevated transition-colors duration-200",
+          "animate-slide-in relative flex h-full w-full max-w-[480px] flex-col border-l transition-colors duration-200",
           dragging ? "border-accent bg-accent/[0.04]" : "border-border",
         )}
+        style={{
+          background: dragging ? undefined : "rgba(5,6,15,0.97)",
+          borderColor: dragging ? undefined : "rgba(186,215,247,0.08)",
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           setDragging(true);

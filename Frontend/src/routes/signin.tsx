@@ -11,11 +11,11 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/dfs/Logo";
 import { Button } from "@/components/dfs/Button";
 import { Field, PasswordField } from "@/components/dfs/Field";
-import { useDfs } from "@/lib/dfs/store";
+import { useDfs } from "@/lib/core/store";
 import { toast } from "sonner";
 
-const title = "Sign in — DFS";
-const description = "Sign in to access your distributed files on DFS.";
+const title = "Sign in — upLoader";
+const description = "Sign in to access your distributed files on upLoader.";
 
 export const Route = createFileRoute("/signin")({
   head: () => ({
@@ -41,9 +41,19 @@ function SignInPage() {
   }, [user, navigate]);
 
   return (
-    <main className="mesh flex min-h-screen items-center justify-center px-6 py-16">
+    <main
+      className="flex min-h-screen items-center justify-center px-6 py-16"
+      style={{
+        background: "#05060f",
+      }}
+    >
+      <div className="ak-grid absolute inset-0 z-0 opacity-50" />
+
       <form
-        className="animate-rise w-full max-w-[420px]"
+        className="ak-glass-card relative z-10 w-full max-w-[420px] p-8"
+        style={{
+          animation: "float 6s ease-in-out infinite",
+        }}
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
@@ -61,8 +71,8 @@ function SignInPage() {
           <Link to="/" className="text-foreground">
             <Logo />
           </Link>
-          <h1 className="mt-8 text-[30px] font-normal tracking-[-0.01em]">Welcome back</h1>
-          <p className="mt-2 text-[15px] text-muted-foreground">
+          <h1 className="ak-gradient-text mt-8 text-[30px] font-medium tracking-tight">Welcome back</h1>
+          <p className="mt-2 text-[15px] text-[var(--ak-moon)]">
             Sign in to access your distributed files
           </p>
         </div>
@@ -94,7 +104,7 @@ function SignInPage() {
           </div>
         </div>
 
-        <Button type="submit" size="lg" full className="mt-6" disabled={busy}>
+        <Button variant="authSubmit" type="submit" size="lg" full className="mt-6" disabled={busy}>
           {busy ? "Signing in…" : "Sign In"}
         </Button>
 

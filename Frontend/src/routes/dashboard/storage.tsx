@@ -9,8 +9,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/dfs/AppShell";
 import { StorageMeter } from "@/components/dfs/StorageMeter";
-import { useDfs } from "@/lib/dfs/store";
-import { formatBytes } from "@/lib/dfs/format";
+import { useDfs } from "@/lib/core/store";
+import { formatBytes } from "@/lib/core/format";
 
 const title = "Storage — DFS";
 const description = "Track distributed storage usage and how it breaks down by file type.";

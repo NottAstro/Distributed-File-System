@@ -2,8 +2,8 @@ import { Download, Share2, Trash2 } from "lucide-react";
 import { Button } from "./Button";
 import { FileTypeIcon } from "./Logo";
 import { StatusDot } from "./StatusDot";
-import { formatBytes, formatDate } from "@/lib/dfs/format";
-import type { DfsFile } from "@/lib/dfs/types";
+import { formatBytes, formatDate } from "@/lib/core/format";
+import type { DfsFile } from "@/lib/core/types";
 
 export function FileTable({
   files,
@@ -22,11 +22,11 @@ export function FileTable({
     <div className="w-full overflow-x-auto">
       <table className="w-full min-w-[820px] border-collapse text-left">
         <thead>
-          <tr className="border-b border-border">
+          <tr className="border-b border-[rgba(186,215,247,0.08)]">
             {["Name", "Size", "Type", "Uploaded", "Status", ""].map((h) => (
               <th
                 key={h}
-                className="py-3 pr-4 font-mono text-[11px] font-normal uppercase tracking-[0.1em] text-faint"
+                className="ak-eyebrow py-3 pr-4 text-left"
               >
                 {h}
               </th>
@@ -38,7 +38,7 @@ export function FileTable({
             <tr
               key={file.id}
               onClick={() => onSelect(file)}
-              className="group h-[52px] cursor-pointer border-b border-border transition-colors duration-200 hover:bg-hover"
+              className="group h-[52px] cursor-pointer border-b border-[rgba(186,215,247,0.08)] transition-colors duration-200 hover:bg-[rgba(186,215,247,0.04)]"
             >
               <td className="max-w-[280px] py-3 pr-4">
                 <span className="flex items-center gap-3">

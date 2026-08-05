@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { formatBytes } from "@/lib/dfs/format";
+import { formatBytes } from "@/lib/core/format";
 
 export function StorageMeter({
   usedBytes,

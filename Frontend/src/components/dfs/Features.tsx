@@ -1,3 +1,4 @@
+// Built for durability
 import { FileTypeIcon } from "./Logo";
 import { Lock, ShieldCheck, Download } from "lucide-react";
 

@@ -14,9 +14,9 @@ import { AppShell } from "@/components/dfs/AppShell";
 import { Button } from "@/components/dfs/Button";
 import { FileTable } from "@/components/dfs/FileTable";
 import { FileDetailPanel } from "@/components/dfs/FileDetailPanel";
-import { useDfs } from "@/lib/dfs/store";
-import type { DfsFile } from "@/lib/dfs/types";
-import * as api from "@/lib/dfs/api";
+import { useDfs } from "@/lib/core/store";
+import type { DfsFile } from "@/lib/core/types";
+import * as api from "@/lib/core/api";
 import { toast } from "sonner";
 
 const title = "My Files — DFS";

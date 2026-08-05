@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { FileStatus } from "@/lib/dfs/types";
+import type { FileStatus } from "@/lib/core/types";
 
 const MAP: Record<FileStatus, { label: string; dot: string; pulse?: boolean }> = {
   distributed: { label: "Distributed", dot: "bg-teal" },

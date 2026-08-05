@@ -12,7 +12,17 @@ export function Logo({ className, mark = true }: { className?: string; mark?: bo
           <rect x="13" y="13" width="6" height="6" fill="currentColor" opacity="0.9" />
         </svg>
       )}
-      <span className="font-mono text-[15px] font-medium tracking-[0.06em]">DFS</span>
+      <span
+        className="text-foreground"
+        style={{
+          fontFamily: "'Space Grotesk', 'Inter', sans-serif",
+          fontWeight: 500,
+          fontSize: 16,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        upLoader
+      </span>
     </span>
   );
 }

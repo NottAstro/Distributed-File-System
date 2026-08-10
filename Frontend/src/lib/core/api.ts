@@ -1,63 +1,114 @@
 import type { DfsFile, DfsUser, StorageUsage } from "./types";
-import { MOCK_FILES, MOCK_STORAGE, MOCK_USER } from "./mock-data";
 import { extensionOf } from "./format";
 
 /**
  * ─────────────────────────────────────────────────────────────
- * DFS API layer (MOCK)
+ * DFS API layer (LIVE — connected to Express backend)
  * ─────────────────────────────────────────────────────────────
  * Every function here is the single seam between UI and backend.
- * To go live, replace each body with a real fetch() call to your
- * Express backend and keep the signatures intact.
- * The UI imports nothing else.
+ * The UI imports nothing else from the network layer.
+ *
+ * Backend: http://localhost:3000/api
+ * Auth tokens are stored in localStorage and sent via
+ * Authorization: Bearer <token> header.
  */
 
-const LATENCY = 420;
-const wait = (ms = LATENCY) => new Promise((r) => setTimeout(r, ms));
+const API_BASE = "/api";
 
-let files: DfsFile[] = [...MOCK_FILES];
+const SESSION_TOKEN_KEY = "dfs.token";
+
+/** Get the stored JWT token */
+function getToken(): string | null {
+  try {
+    return localStorage.getItem(SESSION_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Store the JWT token */
+function setToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(SESSION_TOKEN_KEY, token);
+    else localStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Build headers with auth token */
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
+
+/** Shared response handler — throws on error */
+async function handleResponse<T>(res: Response): Promise<T> {
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error?.message || `Request failed (${res.status})`);
+  }
+  return data;
+}
 
 /* ── Auth ─────────────────────────────────────────────────── */
 
-// TODO(backend): POST /auth/login → { user, token }
-export async function signIn(email: string, _password: string): Promise<DfsUser> {
-  await wait();
-  return { ...MOCK_USER, email };
+export async function signIn(email: string, password: string): Promise<DfsUser> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await handleResponse<{ data: { user: { id: number; username: string; email: string }; token: string } }>(res);
+  setToken(data.data.token);
+  return {
+    id: String(data.data.user.id),
+    name: data.data.user.username,
+    email: data.data.user.email,
+  };
 }
 
-// TODO(backend): POST /auth/register → { user, token }
-export async function signUp(name: string, email: string, _password: string): Promise<DfsUser> {
-  await wait();
-  return { id: "usr_new", name, email };
+export async function signUp(name: string, email: string, password: string): Promise<DfsUser> {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: name, email, password }),
+  });
+  const data = await handleResponse<{ data: { user: { id: number; username: string; email: string }; token: string } }>(res);
+  setToken(data.data.token);
+  return {
+    id: String(data.data.user.id),
+    name: data.data.user.username,
+    email: data.data.user.email,
+  };
 }
 
-// TODO(backend): POST /auth/logout
 export async function signOut(): Promise<void> {
-  await wait(120);
+  setToken(null);
 }
 
 /* ── Files ────────────────────────────────────────────────── */
 
-// TODO(backend): GET /files
+// TODO(Phase 3): Wire to GET /api/files when file endpoints are built
 export async function listFiles(): Promise<DfsFile[]> {
-  await wait(200);
-  return [...files];
+  // File endpoints not yet implemented in backend — return empty for now
+  return [];
 }
 
-// TODO(backend): DELETE /files/:id
-export async function deleteFile(id: string): Promise<void> {
-  await wait(200);
-  files = files.filter((f) => f.id !== id);
+// TODO(Phase 3): Wire to DELETE /api/files/:id
+export async function deleteFile(_id: string): Promise<void> {
+  // File endpoints not yet implemented in backend
 }
 
-// TODO(backend): POST /files/:id/share → { url }
+// TODO(Phase 3): Wire to POST /api/files/:id/share
 export async function createShareLink(id: string): Promise<string> {
-  await wait(200);
   return `https://dfs.io/s/${id}`;
 }
 
 /**
- * TODO(backend): multipart upload — client-side encrypt, chunk, then
+ * TODO(Phase 3): multipart upload — client-side encrypt, chunk, then
  * PUT each chunk to the coordinator. `onProgress` mirrors the real
  * stage machine so the UI needs no changes.
  */
@@ -66,12 +117,13 @@ export async function uploadFile(
   onProgress: (progress: number, stage: "encrypting" | "chunking" | "distributing") => void,
   signal?: { cancelled: boolean },
 ): Promise<DfsFile> {
+  // Simulate upload stages until backend file endpoints exist
   const stages = ["encrypting", "chunking", "distributing"] as const;
   for (let step = 0; step <= 100; step += 4) {
     if (signal?.cancelled) throw new Error("cancelled");
     const stage = stages[Math.min(Math.floor(step / 34), 2)]!;
     onProgress(step, stage);
-    await wait(45);
+    await new Promise((r) => setTimeout(r, 45));
   }
   const created: DfsFile = {
     id: `f_${Math.random().toString(36).slice(2, 8)}`,
@@ -84,12 +136,11 @@ export async function uploadFile(
     nodes: 3,
     encryption: "AES-256-CBC",
   };
-  files = [created, ...files];
   return created;
 }
 
 /**
- * TODO(backend): GET /files/:id/download — fetch chunks from nodes,
+ * TODO(Phase 3): GET /api/files/:id/download — fetch chunks from nodes,
  * reassemble and decrypt, then stream to the browser.
  */
 export async function downloadFile(
@@ -98,15 +149,13 @@ export async function downloadFile(
 ): Promise<void> {
   for (let p = 0; p <= 100; p += 5) {
     onStage(p < 60 ? "reassembling" : p < 100 ? "decrypting" : "ready", p);
-    await wait(60);
+    await new Promise((r) => setTimeout(r, 60));
   }
 }
 
 /* ── Storage ──────────────────────────────────────────────── */
 
-// TODO(backend): GET /storage
+// TODO(Phase 3): Wire to GET /api/storage
 export async function getStorage(): Promise<StorageUsage> {
-  await wait(150);
-  const used = files.reduce((sum, f) => sum + f.size, 0);
-  return { usedBytes: Math.max(used, MOCK_STORAGE.usedBytes), quotaBytes: MOCK_STORAGE.quotaBytes };
+  return { usedBytes: 0, quotaBytes: 10 * 1024 * 1024 * 1024 }; // 10 GB default quota
 }

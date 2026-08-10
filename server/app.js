@@ -7,6 +7,9 @@ const errorHandler = require('./middleware/errorHandler');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
+const fileRoutes = require('./routes/fileRoutes');
+const authenticate = require('./middleware/authMiddleware');
+const fileController = require('./controllers/fileController');
 
 // Create Express app
 const app = express();
@@ -44,6 +47,13 @@ app.get('/api/health', (req, res) => {
 
 // Authentication routes
 app.use('/api/auth', authRoutes);
+
+// File management routes
+app.use('/api/files', fileRoutes);
+
+// Storage and node routes (protected)
+app.get('/api/storage', authenticate, fileController.getStorage);
+app.get('/api/nodes', authenticate, fileController.getNodes);
 
 // ---------------------
 // 404 Handler

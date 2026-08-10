@@ -61,7 +61,9 @@ export async function signIn(email: string, password: string): Promise<DfsUser> 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  const data = await handleResponse<{ data: { user: { id: number; username: string; email: string }; token: string } }>(res);
+  const data = await handleResponse<{
+    data: { user: { id: number; username: string; email: string }; token: string };
+  }>(res);
   setToken(data.data.token);
   return {
     id: String(data.data.user.id),
@@ -76,7 +78,9 @@ export async function signUp(name: string, email: string, password: string): Pro
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username: name, email, password }),
   });
-  const data = await handleResponse<{ data: { user: { id: number; username: string; email: string }; token: string } }>(res);
+  const data = await handleResponse<{
+    data: { user: { id: number; username: string; email: string }; token: string };
+  }>(res);
   setToken(data.data.token);
   return {
     id: String(data.data.user.id),
@@ -91,15 +95,20 @@ export async function signOut(): Promise<void> {
 
 /* ── Files ────────────────────────────────────────────────── */
 
-// TODO(Phase 3): Wire to GET /api/files when file endpoints are built
+// Wire to GET /api/files
 export async function listFiles(): Promise<DfsFile[]> {
-  // File endpoints not yet implemented in backend — return empty for now
-  return [];
+  const res = await fetch(`${API_BASE}/files`, { headers: authHeaders() });
+  const data = await handleResponse<{ data: { files: DfsFile[] } }>(res);
+  return data.data.files;
 }
 
-// TODO(Phase 3): Wire to DELETE /api/files/:id
-export async function deleteFile(_id: string): Promise<void> {
-  // File endpoints not yet implemented in backend
+// Wire to DELETE /api/files/:id
+export async function deleteFile(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/files/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  await handleResponse(res);
 }
 
 // TODO(Phase 3): Wire to POST /api/files/:id/share
@@ -108,54 +117,93 @@ export async function createShareLink(id: string): Promise<string> {
 }
 
 /**
- * TODO(Phase 3): multipart upload — client-side encrypt, chunk, then
- * PUT each chunk to the coordinator. `onProgress` mirrors the real
- * stage machine so the UI needs no changes.
+ * Upload file to backend.
+ * The backend handles chunking and distribution natively. We simulate the stages
+ * here for UI feedback since standard fetch doesn't give us granular progress on upload.
  */
 export async function uploadFile(
-  file: { name: string; size: number },
+  file: File | { name: string; size: number },
   onProgress: (progress: number, stage: "encrypting" | "chunking" | "distributing") => void,
   signal?: { cancelled: boolean },
 ): Promise<DfsFile> {
-  // Simulate upload stages until backend file endpoints exist
-  const stages = ["encrypting", "chunking", "distributing"] as const;
-  for (let step = 0; step <= 100; step += 4) {
-    if (signal?.cancelled) throw new Error("cancelled");
-    const stage = stages[Math.min(Math.floor(step / 34), 2)]!;
-    onProgress(step, stage);
-    await new Promise((r) => setTimeout(r, 45));
+  if (!(file instanceof File)) {
+    throw new Error("Cannot upload without a valid File object");
   }
-  const created: DfsFile = {
-    id: `f_${Math.random().toString(36).slice(2, 8)}`,
-    name: file.name,
-    size: file.size,
-    type: extensionOf(file.name),
-    uploadedAt: new Date().toISOString(),
-    status: "distributed",
-    chunks: Math.max(1, Math.ceil(file.size / (8 * 1024 * 1024))),
-    nodes: 3,
-    encryption: "AES-256-CBC",
-  };
-  return created;
+
+  // Simulate early stages
+  if (signal?.cancelled) throw new Error("cancelled");
+  onProgress(10, "encrypting");
+  await new Promise((r) => setTimeout(r, 100));
+
+  if (signal?.cancelled) throw new Error("cancelled");
+  onProgress(30, "chunking");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers = authHeaders();
+  delete headers["Content-Type"]; // Let browser set multipart boundary
+
+  const res = await fetch(`${API_BASE}/files/upload`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  onProgress(70, "distributing");
+  const data = await handleResponse<{ data: { file: DfsFile } }>(res);
+
+  onProgress(100, "distributing");
+  return data.data.file;
 }
 
 /**
- * TODO(Phase 3): GET /api/files/:id/download — fetch chunks from nodes,
- * reassemble and decrypt, then stream to the browser.
+ * Download file from backend.
+ * Reassembles chunks from nodes, decrypts, and streams to browser.
  */
 export async function downloadFile(
-  _id: string,
+  id: string,
   onStage: (stage: "reassembling" | "decrypting" | "ready", progress: number) => void,
 ): Promise<void> {
-  for (let p = 0; p <= 100; p += 5) {
-    onStage(p < 60 ? "reassembling" : p < 100 ? "decrypting" : "ready", p);
-    await new Promise((r) => setTimeout(r, 60));
+  onStage("reassembling", 20);
+
+  const res = await fetch(`${API_BASE}/files/${id}/download`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Download failed (${res.status})`);
   }
+
+  onStage("decrypting", 70);
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+
+  // Extract filename from Content-Disposition header if possible
+  const disposition = res.headers.get("Content-Disposition");
+  let filename = "downloaded_file";
+  if (disposition && disposition.indexOf("filename=") !== -1) {
+    filename = disposition.split("filename=")[1].replace(/["']/g, "");
+  }
+
+  onStage("ready", 100);
+
+  // Trigger download in browser
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
 }
 
 /* ── Storage ──────────────────────────────────────────────── */
 
-// TODO(Phase 3): Wire to GET /api/storage
+// Wire to GET /api/storage
 export async function getStorage(): Promise<StorageUsage> {
-  return { usedBytes: 0, quotaBytes: 10 * 1024 * 1024 * 1024 }; // 10 GB default quota
+  const res = await fetch(`${API_BASE}/storage`, { headers: authHeaders() });
+  const data = await handleResponse<{ data: StorageUsage }>(res);
+  return data.data;
 }

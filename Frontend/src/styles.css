@@ -89,12 +89,12 @@
   --ak-glass-edge: rgba(186, 215, 247, 0.12);
   --ak-luminous: rgba(199, 211, 234, 0.12);
 
-  --ak-shadow-card: rgba(216, 236, 248, 0.2) 0px 1px 1px 0px inset,
-    rgba(168, 216, 245, 0.06) 0px 24px 48px 0px inset,
-    rgba(0, 0, 0, 0.3) 0px 16px 32px 0px;
-  --ak-shadow-feature: rgba(199, 211, 234, 0.12) 0px 1px 1px 0px inset,
-    rgba(199, 211, 234, 0.05) 0px 24px 48px 0px inset,
-    rgba(6, 6, 14, 0.7) 0px 24px 32px 0px;
+  --ak-shadow-card:
+    rgba(216, 236, 248, 0.2) 0px 1px 1px 0px inset,
+    rgba(168, 216, 245, 0.06) 0px 24px 48px 0px inset, rgba(0, 0, 0, 0.3) 0px 16px 32px 0px;
+  --ak-shadow-feature:
+    rgba(199, 211, 234, 0.12) 0px 1px 1px 0px inset,
+    rgba(199, 211, 234, 0.05) 0px 24px 48px 0px inset, rgba(6, 6, 14, 0.7) 0px 24px 32px 0px;
   --ak-shadow-sm: rgba(186, 207, 247, 0.32) 0px 0px 6px 0px;
   --ak-shadow-md: rgba(238, 186, 247, 0.24) 0px 0px 12px 0px;
 }
@@ -190,7 +190,7 @@
   font-family: "JetBrains Mono", "IBM Plex Mono", monospace;
   font-size: 15px;
   font-weight: 400;
-  letter-spacing: 0.10em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ak-moon);
 }
@@ -221,7 +221,9 @@
   color: #ffffff;
   border-radius: 6px;
   font-weight: 500;
-  transition: opacity 200ms ease, transform 100ms ease;
+  transition:
+    opacity 200ms ease,
+    transform 100ms ease;
 
   &:hover {
     opacity: 0.9;
@@ -290,18 +292,33 @@
 }
 
 @keyframes ak-float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 @keyframes ak-float-left {
-  0%, 100% { transform: rotate(-5deg) translateY(0px) scale(0.88); }
-  50% { transform: rotate(-5deg) translateY(-6px) scale(0.88); }
+  0%,
+  100% {
+    transform: rotate(-5deg) translateY(0px) scale(0.88);
+  }
+  50% {
+    transform: rotate(-5deg) translateY(-6px) scale(0.88);
+  }
 }
 
 @keyframes ak-float-right {
-  0%, 100% { transform: rotate(5deg) translateY(0px) scale(0.88); }
-  50% { transform: rotate(5deg) translateY(-6px) scale(0.88); }
+  0%,
+  100% {
+    transform: rotate(5deg) translateY(0px) scale(0.88);
+  }
+  50% {
+    transform: rotate(5deg) translateY(-6px) scale(0.88);
+  }
 }
 
 @keyframes ak-fade-up {

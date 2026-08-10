@@ -60,7 +60,9 @@ export function Footer() {
         </div>
 
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-border pt-6 sm:flex-row sm:items-center">
-          <p className="font-mono text-[12px] text-faint">© 2026 upLoader — Distributed File Storage</p>
+          <p className="font-mono text-[12px] text-faint">
+            © 2026 upLoader — Distributed File Storage
+          </p>
           <div className="flex items-center gap-1">
             <a
               href="https://github.com"

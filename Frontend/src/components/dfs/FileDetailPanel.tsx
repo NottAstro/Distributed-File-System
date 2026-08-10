@@ -71,7 +71,10 @@ export function FileDetailPanel({
 
         <dl className="flex-1 overflow-y-auto px-6 py-5">
           {meta.map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between border-b border-border py-3">
+            <div
+              key={label}
+              className="flex items-center justify-between border-b border-border py-3"
+            >
               <dt className="font-mono text-[12px] uppercase tracking-[0.08em] text-faint">
                 {label}
               </dt>

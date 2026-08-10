@@ -55,7 +55,14 @@ export function SignInPreviewCard({ isActive = true }: { isActive?: boolean }) {
         </span>
       </div>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
-        <p style={{ fontSize: 18, fontWeight: 500, color: "#d8ecf8", fontFamily: "var(--font-display)" }}>
+        <p
+          style={{
+            fontSize: 18,
+            fontWeight: 500,
+            color: "#d8ecf8",
+            fontFamily: "var(--font-display)",
+          }}
+        >
           Welcome back
         </p>
         <p style={{ fontSize: 12, color: "var(--ak-moon)", marginTop: 4 }}>

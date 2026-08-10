@@ -27,7 +27,7 @@ export function UploadPanel() {
 
   const accept = (list: FileList | null) => {
     if (!list) return;
-    enqueue(Array.from(list).map((f) => ({ name: f.name, size: f.size })));
+    enqueue(Array.from(list));
   };
 
   return (
@@ -60,7 +60,11 @@ export function UploadPanel() {
       >
         <header className="flex h-[68px] items-center justify-between border-b border-border px-6">
           <h2 className="text-[18px] font-medium">Upload to DFS</h2>
-          <Button variant="icon" onClick={() => setUploadOpen(false)} aria-label="Close upload panel">
+          <Button
+            variant="icon"
+            onClick={() => setUploadOpen(false)}
+            aria-label="Close upload panel"
+          >
             <X className="size-4" />
           </Button>
         </header>

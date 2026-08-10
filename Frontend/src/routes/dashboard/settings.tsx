@@ -128,10 +128,16 @@ function SettingsPage() {
 
         <Section label="Danger Zone">
           <div className="flex flex-wrap gap-3">
-            <Button variant="danger" onClick={() => toast.error("Deleting all files is disabled in the demo")}>
+            <Button
+              variant="danger"
+              onClick={() => toast.error("Deleting all files is disabled in the demo")}
+            >
               Delete All Files
             </Button>
-            <Button variant="danger" onClick={() => toast.error("Account deletion is disabled in the demo")}>
+            <Button
+              variant="danger"
+              onClick={() => toast.error("Account deletion is disabled in the demo")}
+            >
               Delete Account
             </Button>
           </div>

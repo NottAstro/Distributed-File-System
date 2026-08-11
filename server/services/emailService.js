@@ -28,6 +28,11 @@ async function getTransporter() {
             pool: true,
             maxConnections: 5,
             maxMessages: 100,
+            connectionTimeout: 5000, // 5 seconds
+            greetingTimeout: 5000,   // 5 seconds
+            socketTimeout: 5000,     // 5 seconds
+            // Force IPv4 because Railway containers often fail to route IPv6 (ENETUNREACH)
+            family: 4,
         });
 
         try {

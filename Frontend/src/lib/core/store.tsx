@@ -83,10 +83,15 @@ export function DfsProvider({ children }: { children: ReactNode }) {
 
   const refreshFiles = useCallback(async () => {
     setFilesLoading(true);
-    const [list, usage] = await Promise.all([api.listFiles(), api.getStorage()]);
-    setFiles(list);
-    setStorage(usage);
-    setFilesLoading(false);
+    try {
+      const [list, usage] = await Promise.all([api.listFiles(), api.getStorage()]);
+      setFiles(list);
+      setStorage(usage);
+    } catch (err) {
+      console.error("Failed to refresh files:", err);
+    } finally {
+      setFilesLoading(false);
+    }
   }, []);
 
   useEffect(() => {

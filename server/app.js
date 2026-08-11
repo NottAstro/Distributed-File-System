@@ -17,6 +17,9 @@ const fileController = require('./controllers/fileController');
 // Create Express app
 const app = express();
 
+// Trust reverse proxy (needed for Rate Limiter when hosted on Railway/Vercel)
+app.set('trust proxy', 1);
+
 // ---------------------
 // Security Middleware
 // ---------------------

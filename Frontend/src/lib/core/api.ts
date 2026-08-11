@@ -13,7 +13,7 @@ import { extensionOf } from "./format";
  * Authorization: Bearer <token> header.
  */
 
-const API_BASE = "/api";
+const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
 
 const SESSION_TOKEN_KEY = "dfs.token";
 

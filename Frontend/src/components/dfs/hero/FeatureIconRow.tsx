@@ -30,7 +30,8 @@ export function FeatureIconRow() {
           transform: "translate(-50%, -50%)",
           width: "calc(100% - 120px)",
           height: 1,
-          background: "linear-gradient(to right, transparent, rgba(186,215,247,0.12) 20%, rgba(186,215,247,0.12) 80%, transparent)",
+          background:
+            "linear-gradient(to right, transparent, rgba(186,215,247,0.12) 20%, rgba(186,215,247,0.12) 80%, transparent)",
           zIndex: 0,
         }}
       />
@@ -63,7 +64,9 @@ export function FeatureIconRow() {
           >
             {f.icon}
           </div>
-          <span style={{ fontSize: 12, color: "var(--ak-moon)", textAlign: "center" }}>{f.label}</span>
+          <span style={{ fontSize: 12, color: "var(--ak-moon)", textAlign: "center" }}>
+            {f.label}
+          </span>
         </div>
       ))}
     </div>

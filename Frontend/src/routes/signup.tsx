@@ -16,7 +16,8 @@ import { useDfs } from "@/lib/core/store";
 import { toast } from "sonner";
 
 const title = "Create your upLoader account";
-const description = "Sign up for upLoader to upload, encrypt and distribute files across storage nodes.";
+const description =
+  "Sign up for upLoader to upload, encrypt and distribute files across storage nodes.";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -78,7 +79,9 @@ function SignUpPage() {
           <Link to="/" className="text-foreground">
             <Logo />
           </Link>
-          <h1 className="ak-gradient-text mt-8 text-[30px] font-medium tracking-tight">Create your account</h1>
+          <h1 className="ak-gradient-text mt-8 text-[30px] font-medium tracking-tight">
+            Create your account
+          </h1>
           <p className="mt-2 text-[15px] text-[var(--ak-moon)]">
             Start distributing files in under a minute
           </p>

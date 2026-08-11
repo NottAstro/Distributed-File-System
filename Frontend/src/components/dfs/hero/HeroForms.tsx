@@ -25,7 +25,10 @@ export function AkInput({
   );
 }
 
-export function AkPasswordInput({ label, ...props }: React.ComponentProps<"input"> & { label: string }) {
+export function AkPasswordInput({
+  label,
+  ...props
+}: React.ComponentProps<"input"> & { label: string }) {
   const [show, setShow] = useState(false);
   return (
     <div className="space-y-1.5">
@@ -71,7 +74,14 @@ export function OrDivider() {
           background: "linear-gradient(to right, transparent, rgba(186,215,247,0.12), transparent)",
         }}
       />
-      <span style={{ fontSize: 11, color: "var(--ak-fog)", letterSpacing: "0.08em", fontFamily: "var(--font-eyebrow)" }}>
+      <span
+        style={{
+          fontSize: 11,
+          color: "var(--ak-fog)",
+          letterSpacing: "0.08em",
+          fontFamily: "var(--font-eyebrow)",
+        }}
+      >
         OR
       </span>
       <span
@@ -107,8 +117,12 @@ export function SocialButton({ icon, label }: { icon: React.ReactNode; label: st
         transition: "background 200ms ease",
         fontFamily: "var(--font-sans)",
       }}
-      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(199,211,234,0.10)")}
-      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(199,211,234,0.06)")}
+      onMouseEnter={(e) =>
+        ((e.currentTarget as HTMLButtonElement).style.background = "rgba(199,211,234,0.10)")
+      }
+      onMouseLeave={(e) =>
+        ((e.currentTarget as HTMLButtonElement).style.background = "rgba(199,211,234,0.06)")
+      }
     >
       {icon}
       {label}

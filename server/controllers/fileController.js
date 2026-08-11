@@ -63,14 +63,15 @@ const fileController = {
                 message: 'File uploaded and distributed successfully',
                 data: {
                     file: {
-                        id: fileId,
+                        id: String(fileId),
                         name: originalname,
-                        size,
-                        type: mimetype,
-                        totalChunks: chunks.length,
-                        nodesUsed: [...new Set(chunks.map(c => c.node_name))].length,
-                        status: 'complete',
+                        size: Number(size),
+                        type: originalname.split('.').pop() || '',
+                        chunks: chunks.length,
+                        nodes: [...new Set(chunks.map(c => c.node_name))].length,
+                        status: 'distributed',
                         uploadedAt: fileRows[0].created_at,
+                        encryption: 'AES-256-CBC'
                     },
                 },
             });
@@ -201,8 +202,8 @@ const fileController = {
 
             logger.info(`Download: reassembling ${chunks.length} chunks for "${file.original_name}"`);
 
-            // Reassemble chunks (with integrity verification)
-            const fileBuffer = await chunkService.reassemble(chunks);
+            // Reassemble chunks (with automatic XOR parity recovery if needed)
+            const fileBuffer = await chunkService.reassemble(chunks, file.file_size);
 
             // Send file to client
             res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);

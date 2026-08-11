@@ -45,7 +45,8 @@ export function LandingNav() {
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLAnchorElement).style.color = "#ffffff";
-                  (e.currentTarget as HTMLAnchorElement).style.background = "rgba(186,214,247,0.08)";
+                  (e.currentTarget as HTMLAnchorElement).style.background =
+                    "rgba(186,214,247,0.08)";
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLAnchorElement).style.color = "var(--ak-moon)";
@@ -59,7 +60,9 @@ export function LandingNav() {
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/signin" style={{ color: "var(--ak-moon)" }}>Sign In</Link>
+              <Link to="/signin" style={{ color: "var(--ak-moon)" }}>
+                Sign In
+              </Link>
             </Button>
             <button
               style={{
@@ -75,9 +78,19 @@ export function LandingNav() {
                 transition: "background 200ms ease",
                 fontFamily: "var(--font-sans)",
               }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(186,214,247,0.12)")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(186,214,247,0.06)")}
-              onClick={() => document.getElementById("hero-signup-submit")?.closest("form")?.querySelector("input")?.focus()}
+              onMouseEnter={(e) =>
+                ((e.currentTarget as HTMLButtonElement).style.background = "rgba(186,214,247,0.12)")
+              }
+              onMouseLeave={(e) =>
+                ((e.currentTarget as HTMLButtonElement).style.background = "rgba(186,214,247,0.06)")
+              }
+              onClick={() =>
+                document
+                  .getElementById("hero-signup-submit")
+                  ?.closest("form")
+                  ?.querySelector("input")
+                  ?.focus()
+              }
             >
               Get Started
             </button>
@@ -87,4 +100,3 @@ export function LandingNav() {
     </header>
   );
 }
-

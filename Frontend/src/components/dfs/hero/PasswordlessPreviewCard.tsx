@@ -52,12 +52,17 @@ export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolea
         </span>
       </div>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
-        <p style={{ fontSize: 18, fontWeight: 500, color: "#d8ecf8", fontFamily: "var(--font-display)" }}>
+        <p
+          style={{
+            fontSize: 18,
+            fontWeight: 500,
+            color: "#d8ecf8",
+            fontFamily: "var(--font-display)",
+          }}
+        >
           Sign in with OTP
         </p>
-        <p style={{ fontSize: 12, color: "var(--ak-moon)", marginTop: 4 }}>
-          Enter your email
-        </p>
+        <p style={{ fontSize: 12, color: "var(--ak-moon)", marginTop: 4 }}>Enter your email</p>
       </div>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <AkInput
@@ -69,7 +74,9 @@ export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolea
           onChange={(e) => setEmail(e.target.value)}
         />
         <div>
-          <label style={{ fontSize: 12, color: "var(--ak-moon)", display: "block", marginBottom: 6 }}>
+          <label
+            style={{ fontSize: 12, color: "var(--ak-moon)", display: "block", marginBottom: 6 }}
+          >
             Code
           </label>
           <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>

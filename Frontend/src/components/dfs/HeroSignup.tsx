@@ -52,7 +52,7 @@ export function HeroSignup() {
         className="ak-grid"
         style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0 }}
       />
-      
+
       {/* Ambient glow behind wordmark */}
       <div
         style={{
@@ -112,8 +112,8 @@ export function HeroSignup() {
             marginBottom: 60,
           }}
         >
-          Split, encrypted and distributed across storage nodes worldwide.
-          Upload once. Retrieve from anywhere, anytime.
+          Split, encrypted and distributed across storage nodes worldwide. Upload once. Retrieve
+          from anywhere, anytime.
         </p>
 
         {/* Three floating cards */}
@@ -124,11 +124,7 @@ export function HeroSignup() {
             marginTop: 20,
           }}
         >
-          {[
-            SignInPreviewCard,
-            SignUpCard,
-            PasswordlessPreviewCard,
-          ].map((CardComponent, index) => {
+          {[SignInPreviewCard, SignUpCard, PasswordlessPreviewCard].map((CardComponent, index) => {
             let offset = index - activeIndex;
             if (offset === 2) offset = -1;
             if (offset === -2) offset = 1;

@@ -71,7 +71,9 @@ function SignInPage() {
           <Link to="/" className="text-foreground">
             <Logo />
           </Link>
-          <h1 className="ak-gradient-text mt-8 text-[30px] font-medium tracking-tight">Welcome back</h1>
+          <h1 className="ak-gradient-text mt-8 text-[30px] font-medium tracking-tight">
+            Welcome back
+          </h1>
           <p className="mt-2 text-[15px] text-[var(--ak-moon)]">
             Sign in to access your distributed files
           </p>

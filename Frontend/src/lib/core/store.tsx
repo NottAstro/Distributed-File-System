@@ -35,7 +35,7 @@ interface DfsContextValue {
   storage: StorageUsage | null;
 
   uploads: UploadItem[];
-  enqueue: (files: { name: string; size: number }[]) => void;
+  enqueue: (files: File[]) => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
   startUploads: () => Promise<void>;
@@ -118,6 +118,7 @@ export function DfsProvider({ children }: { children: ReactNode }) {
             type: extensionOf(f.name),
             progress: 0,
             stage: "queued" as const,
+            file: f,
           })),
         ]),
       removeFromQueue: (id) => {
@@ -136,7 +137,7 @@ export function DfsProvider({ children }: { children: ReactNode }) {
           cancelled.current[item.id] = signal;
           try {
             const created = await api.uploadFile(
-              { name: item.name, size: item.size },
+              item.file || { name: item.name, size: item.size },
               (progress, stage) =>
                 setUploads((prev) =>
                   prev.map((u) => (u.id === item.id ? { ...u, progress, stage } : u)),

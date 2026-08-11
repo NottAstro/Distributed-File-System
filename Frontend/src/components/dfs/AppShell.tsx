@@ -1,15 +1,7 @@
 // Layout of the dashboard after login
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
-import {
-  Files,
-  Upload,
-  DownloadCloud,
-  HardDrive,
-  Settings,
-  PanelLeft,
-  LogOut,
-} from "lucide-react";
+import { Files, Upload, DownloadCloud, HardDrive, Settings, PanelLeft, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDfs } from "@/lib/core/store";
 import { Logo } from "./Logo";
@@ -25,7 +17,11 @@ const NAV = [
   { label: "Settings", to: "/dashboard/settings", icon: Settings },
 ];
 
-export function AppShell({ title, actions, children }: {
+export function AppShell({
+  title,
+  actions,
+  children,
+}: {
   title: string;
   actions?: ReactNode;
   children: ReactNode;

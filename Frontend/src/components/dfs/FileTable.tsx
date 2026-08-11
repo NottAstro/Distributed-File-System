@@ -24,10 +24,7 @@ export function FileTable({
         <thead>
           <tr className="border-b border-[rgba(186,215,247,0.08)]">
             {["Name", "Size", "Type", "Uploaded", "Status", ""].map((h) => (
-              <th
-                key={h}
-                className="ak-eyebrow py-3 pr-4 text-left"
-              >
+              <th key={h} className="ak-eyebrow py-3 pr-4 text-left">
                 {h}
               </th>
             ))}

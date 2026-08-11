@@ -17,10 +17,7 @@ export function Field({ label, hint, className, id, ...props }: FieldProps) {
       </label>
       <input
         id={inputId}
-        className={cn(
-          "ak-input h-11 w-full px-3 text-[15px] disabled:opacity-60",
-          className,
-        )}
+        className={cn("ak-input h-11 w-full px-3 text-[15px] disabled:opacity-60", className)}
         {...props}
       />
       {hint && <p className="font-mono text-[12px] text-faint">{hint}</p>}

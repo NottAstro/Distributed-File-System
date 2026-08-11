@@ -112,7 +112,7 @@ export async function googleLogin(credential: string): Promise<DfsUser> {
     id: String(data.data.user.id),
     name: data.data.user.username,
     email: data.data.user.email,
-    avatarUrl: data.data.user.avatarUrl,
+    ...(data.data.user.avatarUrl ? { avatarUrl: data.data.user.avatarUrl } : {}),
     authProvider: (data.data.user.authProvider as "local" | "google") || "google",
   };
 }
@@ -145,7 +145,7 @@ export async function verifyOtp(email: string, code: string): Promise<DfsUser> {
     id: String(data.data.user.id),
     name: data.data.user.username,
     email: data.data.user.email,
-    avatarUrl: data.data.user.avatarUrl,
+    ...(data.data.user.avatarUrl ? { avatarUrl: data.data.user.avatarUrl } : {}),
     authProvider: (data.data.user.authProvider as "local" | "google") || "local",
   };
 }
@@ -178,7 +178,7 @@ export async function resetPassword(token: string, password: string): Promise<Df
     id: String(data.data.user.id),
     name: data.data.user.username,
     email: data.data.user.email,
-    avatarUrl: data.data.user.avatarUrl,
+    ...(data.data.user.avatarUrl ? { avatarUrl: data.data.user.avatarUrl } : {}),
     authProvider: (data.data.user.authProvider as "local" | "google") || "local",
   };
 }
@@ -274,7 +274,7 @@ export async function downloadFile(
   const disposition = res.headers.get("Content-Disposition");
   let filename = "downloaded_file";
   if (disposition && disposition.indexOf("filename=") !== -1) {
-    filename = disposition.split("filename=")[1].replace(/["']/g, "");
+    filename = disposition.split("filename=")[1]?.replace(/["']/g, "") || "downloaded_file";
   }
 
   onStage("ready", 100);

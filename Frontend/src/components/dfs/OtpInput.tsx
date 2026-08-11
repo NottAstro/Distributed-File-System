@@ -102,10 +102,9 @@ export function OtpInput({
 
       const newDigits = [...digits];
       for (let i = 0; i < pasted.length; i++) {
-        [i] = pasted[i];
+        newDigits[i] = pasted[i] || "";
       }
       setDigits(newDigits);
-newDigits
       // Focus the next empty or last input
       const nextEmpty = newDigits.findIndex((d) => d === "");
       focusInput(nextEmpty === -1 ? length - 1 : nextEmpty);

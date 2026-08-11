@@ -30,15 +30,24 @@ app.use(helmet());
 // HPP — prevents HTTP Parameter Pollution attacks
 app.use(hpp());
 
-// CORS — restrict origins in production, allow all in development
+// CORS — restrict origins in production, allow all localhost in development
 const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000'];
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+    : [];
 
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
+
+        // In development, allow any localhost/127.0.0.1 origin
+        if (process.env.NODE_ENV !== 'production') {
+            if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+                return callback(null, true);
+            }
+        }
+
+        // Check explicit allowlist
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
@@ -87,6 +96,30 @@ const uploadLimiter = rateLimit({
     },
 });
 
+// OTP rate limit: 3 OTP requests per 15 minutes per IP (prevent spam)
+const otpLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        error: { message: 'Too many OTP requests. Please try again in 15 minutes.' },
+    },
+});
+
+// Password reset rate limit: 3 requests per 15 minutes per IP
+const resetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        error: { message: 'Too many reset requests. Please try again in 15 minutes.' },
+    },
+});
+
 // Apply global rate limit to all API routes
 app.use('/api', globalLimiter);
 
@@ -122,6 +155,11 @@ app.get('/api/health', (req, res) => {
 
 // Authentication routes (with strict rate limiting)
 app.use('/api/auth', authLimiter, authRoutes);
+
+// Extra-strict rate limits on OTP and reset routes (stacks with authLimiter)
+app.use('/api/auth/otp', otpLimiter);
+app.use('/api/auth/forgot-password', resetLimiter);
+app.use('/api/auth/reset-password', resetLimiter);
 
 // File management routes (upload route gets its own rate limit)
 app.use('/api/files', fileRoutes);

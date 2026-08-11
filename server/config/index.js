@@ -30,4 +30,22 @@ module.exports = {
     secret:    process.env.JWT_SECRET    || 'fallback_secret_not_for_production',
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   },
+
+  // Google OAuth settings
+  google: {
+    clientId:     process.env.GOOGLE_CLIENT_ID     || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+  },
+
+  // SMTP Email settings
+  smtp: {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT, 10) || 587,
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || '"upLoader" <noreply@uploader.app>',
+  },
+
+  // Frontend URL (for reset links, OAuth redirects)
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
 };

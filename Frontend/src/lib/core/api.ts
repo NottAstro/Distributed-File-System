@@ -93,6 +93,96 @@ export async function signOut(): Promise<void> {
   setToken(null);
 }
 
+/* ── Google OAuth ─────────────────────────────────────────── */
+
+export async function googleLogin(credential: string): Promise<DfsUser> {
+  const res = await fetch(`${API_BASE}/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credential }),
+  });
+  const data = await handleResponse<{
+    data: {
+      user: { id: number; username: string; email: string; authProvider?: string; avatarUrl?: string };
+      token: string;
+    };
+  }>(res);
+  setToken(data.data.token);
+  return {
+    id: String(data.data.user.id),
+    name: data.data.user.username,
+    email: data.data.user.email,
+    avatarUrl: data.data.user.avatarUrl,
+    authProvider: (data.data.user.authProvider as "local" | "google") || "google",
+  };
+}
+
+/* ── OTP Login ────────────────────────────────────────────── */
+
+export async function requestOtp(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/otp/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  await handleResponse(res);
+}
+
+export async function verifyOtp(email: string, code: string): Promise<DfsUser> {
+  const res = await fetch(`${API_BASE}/auth/otp/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  const data = await handleResponse<{
+    data: {
+      user: { id: number; username: string; email: string; authProvider?: string; avatarUrl?: string };
+      token: string;
+    };
+  }>(res);
+  setToken(data.data.token);
+  return {
+    id: String(data.data.user.id),
+    name: data.data.user.username,
+    email: data.data.user.email,
+    avatarUrl: data.data.user.avatarUrl,
+    authProvider: (data.data.user.authProvider as "local" | "google") || "local",
+  };
+}
+
+/* ── Forgot / Reset Password ─────────────────────────────── */
+
+export async function forgotPassword(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  await handleResponse(res);
+}
+
+export async function resetPassword(token: string, password: string): Promise<DfsUser> {
+  const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  });
+  const data = await handleResponse<{
+    data: {
+      user: { id: number; username: string; email: string; authProvider?: string; avatarUrl?: string };
+      token: string;
+    };
+  }>(res);
+  setToken(data.data.token);
+  return {
+    id: String(data.data.user.id),
+    name: data.data.user.username,
+    email: data.data.user.email,
+    avatarUrl: data.data.user.avatarUrl,
+    authProvider: (data.data.user.authProvider as "local" | "google") || "local",
+  };
+}
+
 /* ── Files ────────────────────────────────────────────────── */
 
 // Wire to GET /api/files

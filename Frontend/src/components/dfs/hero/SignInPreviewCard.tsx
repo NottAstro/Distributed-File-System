@@ -1,17 +1,29 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Chrome, Github } from "lucide-react";
 import { useDfs } from "@/lib/core/store";
 import { toast } from "sonner";
 import { GlassCard } from "./GlassCard";
-import { AkInput, AkPasswordInput, OrDivider, SocialButton } from "./HeroForms";
+import { AkInput, AkPasswordInput, OrDivider } from "./HeroForms";
+import { HeroGoogleButton } from "./HeroGoogleButton";
 
 export function SignInPreviewCard({ isActive = true }: { isActive?: boolean }) {
-  const { signIn } = useDfs();
+  const { signIn, googleSignIn } = useDfs();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const handleGoogleCredential = async (credential: string) => {
+    setBusy(true);
+    try {
+      await googleSignIn(credential);
+      void navigate({ to: "/dashboard" });
+    } catch {
+      toast.error("Google sign-in failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,8 +82,7 @@ export function SignInPreviewCard({ isActive = true }: { isActive?: boolean }) {
         </p>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <SocialButton icon={<Chrome size={14} />} label="Continue with Google" />
-        <SocialButton icon={<Github size={14} />} label="Continue with GitHub" />
+        <HeroGoogleButton onCredential={handleGoogleCredential} disabled={busy} />
       </div>
       <OrDivider />
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>

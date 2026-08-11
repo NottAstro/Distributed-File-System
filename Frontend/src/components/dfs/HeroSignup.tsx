@@ -3,6 +3,9 @@ import { SignInPreviewCard } from "./hero/SignInPreviewCard";
 import { PasswordlessPreviewCard } from "./hero/PasswordlessPreviewCard";
 import { SignUpCard } from "./hero/SignUpCard";
 import { FeatureIconRow } from "./hero/FeatureIconRow";
+import { Link } from "@tanstack/react-router";
+import { useDfs } from "@/lib/core/store";
+import { GlassCard } from "./hero/GlassCard";
 
 /* ── Eyebrow with fading lines ── */
 export function Eyebrow({ children }: { children: string }) {
@@ -32,6 +35,7 @@ export function Eyebrow({ children }: { children: string }) {
 /* ── Main export ── */
 export function HeroSignup() {
   const [activeIndex, setActiveIndex] = useState(1);
+  const { user } = useDfs();
 
   return (
     <section
@@ -116,63 +120,122 @@ export function HeroSignup() {
           from anywhere, anytime.
         </p>
 
-        {/* Three floating cards */}
-        <div
-          className="ak-animate-fade-up relative w-full h-[620px]"
-          style={{
-            animationDelay: "240ms",
-            marginTop: 20,
-          }}
-        >
-          {[SignInPreviewCard, SignUpCard, PasswordlessPreviewCard].map((CardComponent, index) => {
-            let offset = index - activeIndex;
-            if (offset === 2) offset = -1;
-            if (offset === -2) offset = 1;
-
-            let transform = "translate(-50%, 0) scale(1) rotate(0deg)";
-            let zIndex = 10;
-            let opacity = 1;
-
-            if (offset === -1) {
-              transform = "translate(calc(-50% - 180px), 40px) scale(0.88) rotate(-5deg)";
-              zIndex = 0;
-              opacity = 0.5;
-            } else if (offset === 1) {
-              transform = "translate(calc(-50% + 180px), 40px) scale(0.88) rotate(5deg)";
-              zIndex = 0;
-              opacity = 0.5;
-            }
-
-            return (
-              <div
-                key={index}
-                className={offset !== 0 ? "hidden lg:block" : ""}
-                style={{
-                  position: "absolute",
-                  left: "50%",
-                  top: 0,
-                  transform,
-                  zIndex,
-                  opacity,
-                  transition: "all 600ms cubic-bezier(0.34, 1.56, 0.64, 1)",
-                  cursor: offset === 0 ? "default" : "pointer",
-                }}
-                onClick={() => {
-                  if (offset !== 0) setActiveIndex(index);
-                }}
-              >
-                <div
+        {/* Three floating cards or Welcome back card */}
+        {user ? (
+          <div
+            className="ak-animate-fade-up relative w-full flex justify-center h-[360px]"
+            style={{
+              animationDelay: "240ms",
+              marginTop: 60,
+            }}
+          >
+            <GlassCard
+              style={{
+                width: 340,
+                textAlign: "center",
+                padding: "48px 32px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div style={{ marginBottom: 24 }}>
+                <span
                   style={{
-                    pointerEvents: offset === 0 ? "auto" : "none",
-                    transition: "opacity 300ms ease",
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 500,
+                    fontSize: 24,
+                    background: "linear-gradient(0deg, #d8ecf8 0%, #98c0ef 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
                   }}
                 >
-                  <CardComponent isActive={offset === 0} />
-                </div>
+                  Welcome back, {user.name}
+                </span>
               </div>
-            );
-          })}
-        </div>
+              <p style={{ color: "var(--ak-moon)", marginBottom: 32, fontSize: 15 }}>
+                You're already signed in and ready to go.
+              </p>
+              <Link
+                to="/dashboard"
+                style={{
+                  display: "inline-block",
+                  width: "100%",
+                  padding: "12px 0",
+                  borderRadius: 6,
+                  background: "#663af3",
+                  color: "#fff",
+                  fontWeight: 500,
+                  fontSize: 15,
+                  textDecoration: "none",
+                  transition: "opacity 200ms ease",
+                }}
+                onMouseEnter={(e) => ((e.target as HTMLElement).style.opacity = "0.9")}
+                onMouseLeave={(e) => ((e.target as HTMLElement).style.opacity = "1")}
+              >
+                Go to Dashboard →
+              </Link>
+            </GlassCard>
+          </div>
+        ) : (
+          <div
+            className="ak-animate-fade-up relative w-full h-[620px]"
+            style={{
+              animationDelay: "240ms",
+              marginTop: 20,
+            }}
+          >
+            {[SignInPreviewCard, SignUpCard, PasswordlessPreviewCard].map((CardComponent, index) => {
+              let offset = index - activeIndex;
+              if (offset === 2) offset = -1;
+              if (offset === -2) offset = 1;
+
+              let transform = "translate(-50%, 0) scale(1) rotate(0deg)";
+              let zIndex = 10;
+              let opacity = 1;
+
+              if (offset === -1) {
+                transform = "translate(calc(-50% - 180px), 40px) scale(0.88) rotate(-5deg)";
+                zIndex = 0;
+                opacity = 0.5;
+              } else if (offset === 1) {
+                transform = "translate(calc(-50% + 180px), 40px) scale(0.88) rotate(5deg)";
+                zIndex = 0;
+                opacity = 0.5;
+              }
+
+              return (
+                <div
+                  key={index}
+                  className={offset !== 0 ? "hidden lg:block" : ""}
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: 0,
+                    transform,
+                    zIndex,
+                    opacity,
+                    transition: "all 600ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                    cursor: offset === 0 ? "default" : "pointer",
+                  }}
+                  onClick={() => {
+                    if (offset !== 0) setActiveIndex(index);
+                  }}
+                >
+                  <div
+                    style={{
+                      pointerEvents: offset === 0 ? "auto" : "none",
+                      transition: "opacity 300ms ease",
+                    }}
+                  >
+                    <CardComponent isActive={offset === 0} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Feature icon row */}
         <div

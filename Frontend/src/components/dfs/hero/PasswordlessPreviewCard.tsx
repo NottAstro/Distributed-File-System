@@ -3,29 +3,44 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { GlassCard } from "./GlassCard";
 import { AkInput } from "./HeroForms";
+import { useDfs } from "@/lib/core/store";
+import { OtpInput } from "../OtpInput";
 
 export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolean }) {
+  const { otpRequest, otpVerify } = useDfs();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleOtpRequest = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!email) {
       toast.error("Please enter your email");
       return;
     }
-    if (code.length < 6) {
-      toast.error("Please enter the 6-digit code");
-      return;
-    }
     setBusy(true);
-    setTimeout(() => {
+    try {
+      await otpRequest(email);
+      setOtpSent(true);
+      toast.success("Login code sent! Check your email.");
+    } catch {
+      toast.error("Could not send login code. Try again.");
+    } finally {
       setBusy(false);
-      toast.success("Code verified!");
+    }
+  };
+
+  const handleOtpComplete = async (code: string) => {
+    setBusy(true);
+    try {
+      await otpVerify(email, code);
       void navigate({ to: "/dashboard" });
-    }, 1000);
+    } catch {
+      toast.error("Invalid or expired code. Try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -62,71 +77,68 @@ export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolea
         >
           Sign in with OTP
         </p>
-        <p style={{ fontSize: 12, color: "var(--ak-moon)", marginTop: 4 }}>Enter your email</p>
-      </div>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <AkInput
-          label="Email address"
-          type="email"
-          required
-          placeholder="you@company.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <div>
-          <label
-            style={{ fontSize: 12, color: "var(--ak-moon)", display: "block", marginBottom: 6 }}
-          >
-            Code
-          </label>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-            <input
-              type="text"
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              style={{
-                width: "100%",
-                letterSpacing: 8,
-                textAlign: "center",
-                fontSize: 20,
-                padding: "12px",
-                borderRadius: 8,
-                background: "rgba(199,211,234,0.06)",
-                boxShadow: "rgba(186,215,247,0.12) 0px 0px 0px 1px inset",
-                color: "#d8ecf8",
-                fontFamily: "var(--font-mono)",
-                outline: "none",
-                border: "none",
-              }}
-              placeholder="000000"
-            />
-          </div>
-        </div>
-        <p style={{ textAlign: "center", fontSize: 12, color: "var(--ak-fog)", marginTop: 8 }}>
-          Resend code
+        <p style={{ fontSize: 12, color: "var(--ak-moon)", marginTop: 4 }}>
+          {otpSent ? `We sent a code to ${email}` : "Enter your email"}
         </p>
-        <button
-          type="submit"
-          disabled={busy}
-          style={{
-            marginTop: 14,
-            width: "100%",
-            padding: "11px 0",
-            borderRadius: 6,
-            background: busy ? "rgba(199,211,234,0.03)" : "rgba(199,211,234,0.06)",
-            boxShadow: "rgba(186,215,247,0.12) 0px 0px 0px 1px inset",
-            color: "#d1e4fa",
-            fontWeight: 500,
-            fontSize: 14,
-            border: "none",
-            cursor: busy ? "not-allowed" : "pointer",
-            fontFamily: "var(--font-sans)",
-          }}
-        >
-          {busy ? "Verifying..." : "Verify code"}
-        </button>
-      </form>
+      </div>
+
+      {!otpSent ? (
+        <form onSubmit={handleOtpRequest} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <AkInput
+            label="Email address"
+            type="email"
+            required
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            style={{
+              marginTop: 14,
+              width: "100%",
+              padding: "11px 0",
+              borderRadius: 6,
+              background: busy ? "rgba(199,211,234,0.03)" : "rgba(199,211,234,0.06)",
+              boxShadow: "rgba(186,215,247,0.12) 0px 0px 0px 1px inset",
+              color: "#d1e4fa",
+              fontWeight: 500,
+              fontSize: 14,
+              border: "none",
+              cursor: busy ? "not-allowed" : "pointer",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            {busy ? "Sending..." : "Send Login Code"}
+          </button>
+        </form>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <OtpInput
+            onComplete={handleOtpComplete}
+            disabled={busy}
+            onResend={() => void handleOtpRequest()}
+            resendCooldown={60}
+            compact
+          />
+          <button
+            type="button"
+            onClick={() => setOtpSent(false)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--ak-moon)",
+              fontSize: 12,
+              cursor: "pointer",
+              marginTop: 8,
+              textAlign: "center"
+            }}
+          >
+            ← Use a different email
+          </button>
+        </div>
+      )}
     </GlassCard>
   );
 }

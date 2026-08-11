@@ -87,6 +87,8 @@
   --ak-violet: #663af3;
   --ak-blueprint: #b6d9fc;
   --ak-glass-edge: rgba(186, 215, 247, 0.12);
+  --ak-glass: rgba(199, 211, 234, 0.06);
+  --ak-glass-border: rgba(186, 215, 247, 0.12);
   --ak-luminous: rgba(199, 211, 234, 0.12);
 
   --ak-shadow-card:

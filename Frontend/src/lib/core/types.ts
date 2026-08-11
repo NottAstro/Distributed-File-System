@@ -18,6 +18,8 @@ export interface DfsUser {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string;
+  authProvider?: "local" | "google";
 }
 
 export interface StorageUsage {

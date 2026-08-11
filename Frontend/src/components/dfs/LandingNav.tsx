@@ -1,8 +1,10 @@
 import { Link } from "@tanstack/react-router";
+import { useDfs } from "@/lib/core/store";
 import { Logo } from "./Logo";
 import { Button } from "./Button";
 
 export function LandingNav() {
+  const { user } = useDfs();
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <div
@@ -59,41 +61,51 @@ export function LandingNav() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/signin" style={{ color: "var(--ak-moon)" }}>
-                Sign In
-              </Link>
-            </Button>
-            <button
-              style={{
-                borderRadius: 999,
-                padding: "8px 16px",
-                background: "rgba(186,214,247,0.06)",
-                boxShadow: "rgba(186,215,247,0.12) 0px 0px 0px 1px inset",
-                color: "#ffffff",
-                fontSize: 14,
-                fontWeight: 500,
-                border: "none",
-                cursor: "pointer",
-                transition: "background 200ms ease",
-                fontFamily: "var(--font-sans)",
-              }}
-              onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLButtonElement).style.background = "rgba(186,214,247,0.12)")
-              }
-              onMouseLeave={(e) =>
-                ((e.currentTarget as HTMLButtonElement).style.background = "rgba(186,214,247,0.06)")
-              }
-              onClick={() =>
-                document
-                  .getElementById("hero-signup-submit")
-                  ?.closest("form")
-                  ?.querySelector("input")
-                  ?.focus()
-              }
-            >
-              Get Started
-            </button>
+            {user ? (
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/dashboard" style={{ color: "var(--ak-moon)" }}>
+                  Dashboard
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/signin" style={{ color: "var(--ak-moon)" }}>
+                    Sign In
+                  </Link>
+                </Button>
+                <button
+                  style={{
+                    borderRadius: 999,
+                    padding: "8px 16px",
+                    background: "rgba(186,214,247,0.06)",
+                    boxShadow: "rgba(186,215,247,0.12) 0px 0px 0px 1px inset",
+                    color: "#ffffff",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "background 200ms ease",
+                    fontFamily: "var(--font-sans)",
+                  }}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLButtonElement).style.background = "rgba(186,214,247,0.12)")
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLButtonElement).style.background = "rgba(186,214,247,0.06)")
+                  }
+                  onClick={() =>
+                    document
+                      .getElementById("hero-signup-submit")
+                      ?.closest("form")
+                      ?.querySelector("input")
+                      ?.focus()
+                  }
+                >
+                  Get Started
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

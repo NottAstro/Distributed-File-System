@@ -8,6 +8,8 @@ export default defineConfig({
   },
   vite: {
     server: {
+      port: 5173,
+      strictPort: true, // Fail if 5173 is in use, to guarantee we use the authorized port
       proxy: {
         "/api": "http://localhost:3000",
       },

@@ -26,6 +26,11 @@ interface DfsContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  googleSignIn: (credential: string) => Promise<void>;
+  otpRequest: (email: string) => Promise<void>;
+  otpVerify: (email: string, code: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
 
   files: DfsFile[];
   filesLoading: boolean;
@@ -99,6 +104,11 @@ export function DfsProvider({ children }: { children: ReactNode }) {
         persist(null);
         setFiles([]);
       },
+      googleSignIn: async (credential) => persist(await api.googleLogin(credential)),
+      otpRequest: async (email) => { await api.requestOtp(email); },
+      otpVerify: async (email, code) => persist(await api.verifyOtp(email, code)),
+      forgotPassword: async (email) => { await api.forgotPassword(email); },
+      resetPassword: async (token, password) => persist(await api.resetPassword(token, password)),
       files,
       filesLoading,
       refreshFiles,

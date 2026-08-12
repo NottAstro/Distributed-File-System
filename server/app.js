@@ -47,11 +47,18 @@ app.use(cors({
             }
         }
 
+        // Allow any Vercel preview deployment automatically
+        if (origin.endsWith('.vercel.app')) {
+            return callback(null, true);
+        }
+
         // Check explicit allowlist
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
-        return callback(new Error('Not allowed by CORS'));
+        
+        // Return false instead of throwing an Error to prevent 500 crashes
+        return callback(null, false);
     },
     credentials: true,
 }));

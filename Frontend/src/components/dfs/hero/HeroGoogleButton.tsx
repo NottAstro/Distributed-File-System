@@ -14,12 +14,14 @@ interface HeroGoogleButtonProps {
   onCredential: (credential: string) => void;
   disabled?: boolean;
   label?: string;
+  isActive?: boolean;
 }
 
 export function HeroGoogleButton({
   onCredential,
   disabled = false,
   label = "Sign in with Google",
+  isActive = true,
 }: HeroGoogleButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -27,12 +29,15 @@ export function HeroGoogleButton({
   callbackRef.current = onCredential;
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
+    if (!GOOGLE_CLIENT_ID || !isActive) return;
 
     const scriptId = "google-gsi-script";
 
     function initGoogle() {
       if (!window.google || !containerRef.current) return;
+
+      // Clear any stale iframes from previous renders
+      containerRef.current.innerHTML = "";
 
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
@@ -40,7 +45,7 @@ export function HeroGoogleButton({
           callbackRef.current(response.credential);
         },
         auto_select: false,
-        cancel_on_tap_outside: true,
+        cancel_on_tap_outside: false,
       });
 
       window.google.accounts.id.renderButton(containerRef.current, {
@@ -61,7 +66,9 @@ export function HeroGoogleButton({
         initGoogle();
       } else {
         const existingScript = document.getElementById(scriptId) as HTMLScriptElement;
-        existingScript.addEventListener("load", () => setTimeout(initGoogle, 100));
+        const handler = () => setTimeout(initGoogle, 100);
+        existingScript.addEventListener("load", handler);
+        return () => existingScript.removeEventListener("load", handler);
       }
       return;
     }
@@ -73,7 +80,7 @@ export function HeroGoogleButton({
     script.defer = true;
     script.onload = () => setTimeout(initGoogle, 100);
     document.head.appendChild(script);
-  }, []);
+  }, [isActive]); // Re-initialize when this card becomes active
 
   if (!GOOGLE_CLIENT_ID) return null;
 
@@ -128,3 +135,4 @@ export function HeroGoogleButton({
     </div>
   );
 }
+

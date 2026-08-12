@@ -1,10 +1,37 @@
 const express = require('express');
 const { body } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 const authController = require('../controllers/authController');
 const oauthController = require('../controllers/oauthController');
 const authenticate = require('../middleware/authMiddleware');
 
 const router = express.Router();
+
+// --- Rate Limiters (route-specific) ---
+
+// OTP rate limit: 5 OTP requests per 15 minutes per IP
+const otpLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        error: { message: 'Too many OTP requests. Please try again in 15 minutes.' },
+    },
+});
+
+// Password reset rate limit: 5 requests per 15 minutes per IP
+const resetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        error: { message: 'Too many reset requests. Please try again in 15 minutes.' },
+    },
+});
 
 // --- Validation Rules ---
 // These run BEFORE the controller and reject bad input early
@@ -94,16 +121,17 @@ router.get('/profile', authenticate, authController.getProfile);
 // POST /api/auth/google — Google OAuth login (ID token verification)
 router.post('/google', googleValidation, oauthController.googleLogin);
 
-// POST /api/auth/otp/request — Request an OTP code via email
-router.post('/otp/request', otpRequestValidation, oauthController.requestOtp);
+// POST /api/auth/otp/request — Request an OTP code via email (rate limited)
+router.post('/otp/request', otpLimiter, otpRequestValidation, oauthController.requestOtp);
 
-// POST /api/auth/otp/verify — Verify OTP code and login
-router.post('/otp/verify', otpVerifyValidation, oauthController.verifyOtp);
+// POST /api/auth/otp/verify — Verify OTP code and login (rate limited)
+router.post('/otp/verify', otpLimiter, otpVerifyValidation, oauthController.verifyOtp);
 
-// POST /api/auth/forgot-password — Request password reset email
-router.post('/forgot-password', forgotPasswordValidation, oauthController.forgotPassword);
+// POST /api/auth/forgot-password — Request password reset email (rate limited)
+router.post('/forgot-password', resetLimiter, forgotPasswordValidation, oauthController.forgotPassword);
 
-// POST /api/auth/reset-password — Reset password with token
-router.post('/reset-password', resetPasswordValidation, oauthController.resetPassword);
+// POST /api/auth/reset-password — Reset password with token (rate limited)
+router.post('/reset-password', resetLimiter, resetPasswordValidation, oauthController.resetPassword);
 
 module.exports = router;
+

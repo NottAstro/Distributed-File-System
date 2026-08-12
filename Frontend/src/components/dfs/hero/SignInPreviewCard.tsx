@@ -82,7 +82,7 @@ export function SignInPreviewCard({ isActive = true }: { isActive?: boolean }) {
         </p>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <HeroGoogleButton onCredential={handleGoogleCredential} disabled={busy} />
+        <HeroGoogleButton onCredential={handleGoogleCredential} disabled={busy} isActive={isActive} />
       </div>
       <OrDivider />
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>

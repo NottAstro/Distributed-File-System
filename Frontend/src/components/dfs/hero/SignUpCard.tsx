@@ -144,7 +144,7 @@ export function SignUpCard({ isActive = true }: { isActive?: boolean }) {
       <OrDivider />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <HeroGoogleButton onCredential={handleGoogleCredential} disabled={busy} label="Continue with Google" />
+        <HeroGoogleButton onCredential={handleGoogleCredential} disabled={busy} label="Continue with Google" isActive={isActive} />
       </div>
 
       <p style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "var(--ak-fog)" }}>

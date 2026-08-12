@@ -79,10 +79,10 @@ const globalLimiter = rateLimit({
     },
 });
 
-// Strict rate limit for auth routes: 10 attempts per 15 minutes per IP
+// Strict rate limit for auth routes: 30 attempts per 15 minutes per IP
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: 30,
     standardHeaders: true,
     legacyHeaders: false,
     message: {
@@ -161,12 +161,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Authentication routes (with strict rate limiting)
+// NOTE: OTP and reset rate limits are applied directly in authRoutes.js
 app.use('/api/auth', authLimiter, authRoutes);
-
-// Extra-strict rate limits on OTP and reset routes (stacks with authLimiter)
-app.use('/api/auth/otp', otpLimiter);
-app.use('/api/auth/forgot-password', resetLimiter);
-app.use('/api/auth/reset-password', resetLimiter);
 
 // File management routes (upload route gets its own rate limit)
 app.use('/api/files', fileRoutes);

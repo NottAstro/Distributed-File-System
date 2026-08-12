@@ -77,6 +77,8 @@ export function GoogleSignInButton({
   const [ready, setReady] = useState(false);
   const callbackRef = useRef(onCredential);
   callbackRef.current = onCredential;
+  const textRef = useRef(text);
+  textRef.current = text;
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
@@ -86,13 +88,16 @@ export function GoogleSignInButton({
     function initializeGoogle() {
       if (!window.google || !containerRef.current) return;
 
+      // Clear any stale iframes from previous renders
+      containerRef.current.innerHTML = "";
+
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: (response: { credential: string }) => {
           callbackRef.current(response.credential);
         },
         auto_select: false,
-        cancel_on_tap_outside: true,
+        cancel_on_tap_outside: false,
       });
 
       window.google.accounts.id.renderButton(containerRef.current, {
@@ -100,7 +105,7 @@ export function GoogleSignInButton({
         theme: "filled_black",
         size: "large",
         width: 400,
-        text,
+        text: textRef.current,
         shape: "rectangular",
         logo_alignment: "left",
       });
@@ -108,12 +113,15 @@ export function GoogleSignInButton({
       setReady(true);
     }
 
+    // Always attempt to (re-)initialize when this effect runs
     if (document.getElementById(scriptId)) {
       if (window.google) {
         initializeGoogle();
       } else {
         const existingScript = document.getElementById(scriptId) as HTMLScriptElement;
-        existingScript.addEventListener("load", () => setTimeout(initializeGoogle, 100));
+        const handler = () => setTimeout(initializeGoogle, 100);
+        existingScript.addEventListener("load", handler);
+        return () => existingScript.removeEventListener("load", handler);
       }
       return;
     }
@@ -126,7 +134,7 @@ export function GoogleSignInButton({
     script.onload = () => setTimeout(initializeGoogle, 100);
     script.onerror = () => setReady(false);
     document.head.appendChild(script);
-  }, [text]);
+  }, []); // Run once on mount — refs keep values fresh
 
   if (!GOOGLE_CLIENT_ID) {
     return null;

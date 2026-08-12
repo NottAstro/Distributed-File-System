@@ -13,7 +13,10 @@ import { extensionOf } from "./format";
  * Authorization: Bearer <token> header.
  */
 
-const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
+const isProd = (import.meta as any).env?.PROD;
+// Force the use of the local proxy (/api) in production to bypass CORS issues,
+// otherwise use VITE_API_URL for local development if specified.
+const API_BASE = isProd ? "/api" : ((import.meta as any).env?.VITE_API_URL || "/api");
 
 const SESSION_TOKEN_KEY = "dfs.token";
 

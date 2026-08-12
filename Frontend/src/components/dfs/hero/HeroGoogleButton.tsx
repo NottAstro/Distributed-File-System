@@ -25,41 +25,26 @@ export function HeroGoogleButton({
 }: HeroGoogleButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
+
   const callbackRef = useRef(onCredential);
   callbackRef.current = onCredential;
 
+  // 1. Load script
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || !isActive) return;
 
     let isMounted = true;
     const scriptId = "google-gsi-script";
 
-    function initGoogle() {
-      if (!isMounted || !containerRef.current) return;
-
-      // Clear any stale iframes from previous renders
-      containerRef.current.innerHTML = "";
-
-      window.google!.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: (response: { credential: string }) => {
-          callbackRef.current(response.credential);
-        },
-        auto_select: false,
-        cancel_on_tap_outside: false,
-      });
-
-      window.google!.accounts.id.renderButton(containerRef.current, {
-        type: "standard",
-        theme: "filled_black",
-        size: "large",
-        width: 300,
-        text: "signin_with",
-        shape: "rectangular",
-        logo_alignment: "left",
-      });
-
-      setReady(true);
+    function pollGoogle() {
+      if (!isMounted) return;
+      if (window.google?.accounts?.id) {
+        setScriptLoaded(true);
+      } else {
+        setTimeout(pollGoogle, 100);
+      }
     }
 
     if (!document.getElementById(scriptId)) {
@@ -71,30 +56,53 @@ export function HeroGoogleButton({
       document.head.appendChild(script);
     }
 
-    let attempts = 0;
-    function pollGoogle() {
-      if (!isMounted) return;
-      if (window.google?.accounts?.id) {
-        initGoogle();
-      } else if (attempts < 100) {
-        attempts++;
-        setTimeout(pollGoogle, 100);
-      }
-    }
-
     pollGoogle();
 
     return () => {
       isMounted = false;
     };
-  }, [isActive]); // Re-initialize when this card becomes active
+  }, [isActive]);
+
+  // 2. Render button
+  useEffect(() => {
+    if (!scriptLoaded || !containerRef.current || !isActive) return;
+
+    window.google!.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: (response: { credential: string }) => {
+        callbackRef.current(response.credential);
+      },
+      auto_select: false,
+      cancel_on_tap_outside: false,
+    });
+
+    window.google!.accounts.id.renderButton(containerRef.current, {
+      type: "standard",
+      theme: "filled_black",
+      size: "large",
+      width: 300,
+      text: "signin_with",
+      shape: "rectangular",
+      logo_alignment: "left",
+    });
+
+    setReady(true);
+  }, [scriptLoaded, resetKey, isActive]);
+
+  // 3. Reset on focus
+  useEffect(() => {
+    const handleFocus = () => setResetKey((prev) => prev + 1);
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, []);
 
   if (!GOOGLE_CLIENT_ID) return null;
 
   return (
     <div
+      key={resetKey}
       className="relative w-full"
-      style={{ height: 40, overflow: "hidden", borderRadius: 8 }}
+      style={{ height: 44, overflow: "hidden", borderRadius: 8 }}
     >
       {/* Hidden real Google button — sits on top for click handling */}
       <div

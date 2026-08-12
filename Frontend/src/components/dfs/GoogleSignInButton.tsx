@@ -75,43 +75,28 @@ export function GoogleSignInButton({
 }: GoogleSignInButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
+  
   const callbackRef = useRef(onCredential);
   callbackRef.current = onCredential;
   const textRef = useRef(text);
   textRef.current = text;
 
+  // 1. Load the Google script exactly once
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
 
     let isMounted = true;
     const scriptId = "google-gsi-script";
 
-    function initGoogle() {
-      if (!isMounted || !containerRef.current) return;
-
-      // Clear any stale iframes from previous renders
-      containerRef.current.innerHTML = "";
-
-      window.google!.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: (response: { credential: string }) => {
-          callbackRef.current(response.credential);
-        },
-        auto_select: false,
-        cancel_on_tap_outside: false,
-      });
-
-      window.google!.accounts.id.renderButton(containerRef.current, {
-        type: "standard",
-        theme: "filled_black",
-        size: "large",
-        width: 400,
-        text: textRef.current,
-        shape: "rectangular",
-        logo_alignment: "left",
-      });
-
-      setReady(true);
+    function pollGoogle() {
+      if (!isMounted) return;
+      if (window.google?.accounts?.id) {
+        setScriptLoaded(true);
+      } else {
+        setTimeout(pollGoogle, 100);
+      }
     }
 
     if (!document.getElementById(scriptId)) {
@@ -123,65 +108,71 @@ export function GoogleSignInButton({
       document.head.appendChild(script);
     }
 
-    let attempts = 0;
-    function pollGoogle() {
-      if (!isMounted) return;
-      if (window.google?.accounts?.id) {
-        initGoogle();
-      } else if (attempts < 100) {
-        attempts++;
-        setTimeout(pollGoogle, 100);
-      } else {
-        console.error("Google Sign-In failed to load");
-        setReady(false);
-      }
-    }
-
     pollGoogle();
 
     return () => {
       isMounted = false;
     };
-  }, []); // Run once on mount — refs keep values fresh
+  }, []);
+
+  // 2. Render the button when script is loaded OR when resetKey changes
+  useEffect(() => {
+    if (!scriptLoaded || !containerRef.current) return;
+
+    // We must initialize before rendering
+    window.google!.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: (response: { credential: string }) => {
+        callbackRef.current(response.credential);
+      },
+      auto_select: false,
+      cancel_on_tap_outside: false,
+    });
+
+    window.google!.accounts.id.renderButton(containerRef.current, {
+      type: "standard",
+      theme: "filled_black",
+      size: "large",
+      width: 400,
+      text: textRef.current,
+      shape: "rectangular",
+      logo_alignment: "left",
+    });
+
+    setReady(true);
+  }, [scriptLoaded, resetKey]);
+
+  // 3. If user closes the popup, the window regains focus. 
+  // We increment resetKey to completely destroy and recreate the DOM node, 
+  // wiping Google's "disabled" cooldown state from the element.
+  useEffect(() => {
+    const handleFocus = () => {
+      setResetKey((prev) => prev + 1);
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, []);
 
   if (!GOOGLE_CLIENT_ID) {
     return null;
   }
 
-  const label = LABEL_MAP[text] || "Sign in with Google";
-
   return (
     <div
-      className="relative w-full"
-      style={{ height: 44, overflow: "hidden", borderRadius: 8 }}
+      key={resetKey}
+      className={`relative w-full flex justify-center items-center ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+      style={{ minHeight: 44 }}
     >
-      {/* Hidden real Google button — sits on top for click handling */}
       <div
         ref={containerRef}
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 2,
-          opacity: 0,
-          cursor: "pointer",
-        }}
-        className={`[&>div]:!w-full [&>div]:!h-full [&_iframe]:!w-full [&_iframe]:!h-full ${disabled ? "pointer-events-none" : ""}`}
+        className="w-full flex justify-center [&>div]:!w-full [&>div]:!flex [&>div]:!justify-center"
       />
-
-      {/* Visible styled button — purely visual */}
-      <div
-        className={`flex h-full w-full items-center justify-center gap-3 rounded-lg border border-[var(--ak-glass-border)] bg-[var(--ak-glass)] text-[14px] font-medium text-foreground transition-all duration-200 hover:bg-[rgba(199,211,234,0.10)] ${disabled ? "opacity-50" : ""}`}
-        style={{ fontFamily: "var(--font-sans)", position: "relative", zIndex: 1 }}
-      >
-        {ready ? (
-          <>
-            <GoogleLogo />
-            {label}
-          </>
-        ) : (
+      
+      {!ready && (
+        <div className="absolute inset-0 flex h-full w-full items-center justify-center rounded-lg border border-[var(--ak-glass-border)] bg-[var(--ak-glass)]">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--ak-moon)] border-t-transparent" />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

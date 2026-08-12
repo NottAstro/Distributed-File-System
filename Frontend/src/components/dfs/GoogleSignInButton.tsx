@@ -160,19 +160,52 @@ export function GoogleSignInButton({
   return (
     <div
       key={resetKey}
-      className={`relative w-full flex justify-center items-center ${disabled ? "opacity-50 pointer-events-none" : ""}`}
-      style={{ minHeight: 44 }}
+      className="relative w-full"
+      style={{ height: 44, overflow: "hidden", borderRadius: 8 }}
     >
+      {/* Hidden real Google button — sits on top for click handling */}
       <div
         ref={containerRef}
-        className="w-full flex justify-center [&>div]:!w-full [&>div]:!flex [&>div]:!justify-center"
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 2,
+          opacity: 0,
+          cursor: "pointer",
+        }}
+        className={`[&>div]:!w-full [&>div]:!h-full [&_iframe]:!w-full [&_iframe]:!h-full ${disabled ? "pointer-events-none" : ""}`}
       />
-      
-      {!ready && (
-        <div className="absolute inset-0 flex h-full w-full items-center justify-center rounded-lg border border-[var(--ak-glass-border)] bg-[var(--ak-glass)]">
+
+      {/* Visible styled button — purely visual */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+          width: "100%",
+          height: "100%",
+          borderRadius: 8,
+          background: "rgba(199,211,234,0.06)",
+          boxShadow: "rgba(186,215,247,0.12) 0px 0px 0px 1px inset",
+          color: "#ffffff",
+          fontSize: 13,
+          fontWeight: 500,
+          fontFamily: "var(--font-sans)",
+          opacity: disabled || !ready ? 0.5 : 1,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {ready ? (
+          <>
+            <GoogleLogo size={18} />
+            {LABEL_MAP[textRef.current] || "Sign in with Google"}
+          </>
+        ) : (
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--ak-moon)] border-t-transparent" />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

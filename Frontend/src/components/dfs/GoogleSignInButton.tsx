@@ -83,15 +83,16 @@ export function GoogleSignInButton({
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
 
+    let isMounted = true;
     const scriptId = "google-gsi-script";
 
-    function initializeGoogle() {
-      if (!window.google || !containerRef.current) return;
+    function initGoogle() {
+      if (!isMounted || !containerRef.current) return;
 
       // Clear any stale iframes from previous renders
       containerRef.current.innerHTML = "";
 
-      window.google.accounts.id.initialize({
+      window.google!.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: (response: { credential: string }) => {
           callbackRef.current(response.credential);
@@ -100,7 +101,7 @@ export function GoogleSignInButton({
         cancel_on_tap_outside: false,
       });
 
-      window.google.accounts.id.renderButton(containerRef.current, {
+      window.google!.accounts.id.renderButton(containerRef.current, {
         type: "standard",
         theme: "filled_black",
         size: "large",
@@ -113,27 +114,34 @@ export function GoogleSignInButton({
       setReady(true);
     }
 
-    // Always attempt to (re-)initialize when this effect runs
-    if (document.getElementById(scriptId)) {
-      if (window.google) {
-        initializeGoogle();
-      } else {
-        const existingScript = document.getElementById(scriptId) as HTMLScriptElement;
-        const handler = () => setTimeout(initializeGoogle, 100);
-        existingScript.addEventListener("load", handler);
-        return () => existingScript.removeEventListener("load", handler);
-      }
-      return;
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
     }
 
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setTimeout(initializeGoogle, 100);
-    script.onerror = () => setReady(false);
-    document.head.appendChild(script);
+    let attempts = 0;
+    function pollGoogle() {
+      if (!isMounted) return;
+      if (window.google?.accounts?.id) {
+        initGoogle();
+      } else if (attempts < 100) {
+        attempts++;
+        setTimeout(pollGoogle, 100);
+      } else {
+        console.error("Google Sign-In failed to load");
+        setReady(false);
+      }
+    }
+
+    pollGoogle();
+
+    return () => {
+      isMounted = false;
+    };
   }, []); // Run once on mount — refs keep values fresh
 
   if (!GOOGLE_CLIENT_ID) {

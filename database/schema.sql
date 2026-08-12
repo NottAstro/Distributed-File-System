@@ -9,6 +9,15 @@ CREATE DATABASE IF NOT EXISTS distributed_fs
 
 USE distributed_fs;
 
+-- Drop existing tables to allow clean recreation with new schema
+DROP TABLE IF EXISTS replicas;
+DROP TABLE IF EXISTS chunks;
+DROP TABLE IF EXISTS files;
+DROP TABLE IF EXISTS password_reset_tokens;
+DROP TABLE IF EXISTS otp_codes;
+DROP TABLE IF EXISTS storage_nodes;
+DROP TABLE IF EXISTS users;
+
 -- -----------------------------------------
 -- Table: users
 -- Purpose: Stores registered user accounts
@@ -16,9 +25,12 @@ USE distributed_fs;
 -- -----------------------------------------
 CREATE TABLE IF NOT EXISTS users (
     id              INT AUTO_INCREMENT PRIMARY KEY,
-    username        VARCHAR(50)  NOT NULL UNIQUE,
+    username        VARCHAR(50)  NOT NULL,
     email           VARCHAR(100) NOT NULL UNIQUE,
-    password_hash   VARCHAR(255) NOT NULL,
+    password_hash   VARCHAR(255),
+    google_id       VARCHAR(255) UNIQUE,
+    auth_provider   ENUM('local', 'google') DEFAULT 'local',
+    avatar_url      VARCHAR(500),
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -105,4 +117,38 @@ CREATE TABLE IF NOT EXISTS replicas (
     FOREIGN KEY (node_id) REFERENCES storage_nodes(id),
     UNIQUE KEY unique_replica (chunk_id, node_id),
     INDEX idx_replicas_chunk_id (chunk_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- -----------------------------------------
+-- Table: otp_codes
+-- Purpose: Stores OTPs for email login
+-- -----------------------------------------
+CREATE TABLE IF NOT EXISTS otp_codes (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    email           VARCHAR(100) NOT NULL,
+    code_hash       VARCHAR(255) NOT NULL,
+    purpose         ENUM('login', 'verify') DEFAULT 'login',
+    attempts        INT DEFAULT 0,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at      TIMESTAMP NOT NULL,
+    
+    INDEX idx_otp_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- -----------------------------------------
+-- Table: password_reset_tokens
+-- Purpose: Stores tokens for password resets
+-- -----------------------------------------
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT NOT NULL,
+    token_hash      VARCHAR(255) NOT NULL,
+    used            BOOLEAN DEFAULT FALSE,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at      TIMESTAMP NOT NULL,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_reset_token (token_hash)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,7 +1,11 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
 const config = require('../config');
 const logger = require('../utils/logger');
 
+// Force Node.js to resolve IPv4 addresses first.
+// This prevents ENETUNREACH SMTP errors on environments that don't route IPv6 (like Railway).
+dns.setDefaultResultOrder('ipv4first');
 /**
  * Email Service
  *

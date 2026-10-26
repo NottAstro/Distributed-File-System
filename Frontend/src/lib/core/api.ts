@@ -1,5 +1,12 @@
-import type { DfsFile, DfsUser, StorageUsage } from "./types";
-import { extensionOf } from "./format";
+import type {
+  DfsFile,
+  DfsFolder,
+  DfsUser,
+  FileDetail,
+  FolderContents,
+  StorageNode,
+  StorageUsage,
+} from "./types";
 
 /**
  * ─────────────────────────────────────────────────────────────
@@ -16,7 +23,7 @@ import { extensionOf } from "./format";
 const isProd = (import.meta as any).env?.PROD;
 // Force the use of the local proxy (/api) in production to bypass CORS issues,
 // otherwise use VITE_API_URL for local development if specified.
-const API_BASE = isProd ? "/api" : ((import.meta as any).env?.VITE_API_URL || "/api");
+const API_BASE = isProd ? "/api" : (import.meta as any).env?.VITE_API_URL || "/api";
 
 const SESSION_TOKEN_KEY = "dfs.token";
 
@@ -40,56 +47,107 @@ function setToken(token: string | null): void {
 }
 
 /** Build headers with auth token */
-function authHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+function authHeaders(json = true): Record<string, string> {
+  const headers: Record<string, string> = json ? { "Content-Type": "application/json" } : {};
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;
 }
 
-/** Shared response handler — throws on error */
-async function handleResponse<T>(res: Response): Promise<T> {
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error?.message || `Request failed (${res.status})`);
+/** Fired when an authenticated call gets 401 — the store signs the user out. */
+export const UNAUTHORIZED_EVENT = "dfs:unauthorized";
+
+function notifyUnauthorized(status: number, hadToken: boolean) {
+  if (status === 401 && hadToken && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   }
-  return data;
+}
+
+/** Friendly message for statuses that usually come back as HTML from a proxy. */
+function statusMessage(status: number): string {
+  if (status === 413) return "File is too large for the server.";
+  if (status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (status === 502 || status === 503 || status === 504)
+    return "The server is unavailable. Try again shortly.";
+  return `Request failed (${status})`;
+}
+
+/**
+ * Shared response handler — throws on error.
+ * Tolerates non-JSON bodies (proxy error pages), which used to surface as
+ * "Unexpected token '<'" instead of a useful message.
+ */
+type ApiEnvelope = { success?: boolean; error?: { message?: string } } | null;
+
+async function handleResponse<T>(res: Response, hadToken = false): Promise<T> {
+  let data: ApiEnvelope = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* non-JSON body */
+  }
+  if (!res.ok || !data?.success) {
+    notifyUnauthorized(res.status, hadToken);
+    throw new Error(data?.error?.message || statusMessage(res.status));
+  }
+  return data as T;
+}
+
+/** Authenticated JSON request. */
+async function authed<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) },
+  });
+  return handleResponse<T>(res, true);
+}
+
+type AuthPayload = {
+  data: {
+    user: {
+      id: number;
+      username: string;
+      email: string;
+      authProvider?: string;
+      avatarUrl?: string;
+    };
+    token: string;
+  };
+};
+
+/** Store the token and map the server user to the client shape. */
+function acceptAuth(data: AuthPayload, defaultProvider?: "local" | "google"): DfsUser {
+  setToken(data.data.token);
+  const u = data.data.user;
+  const provider = (u.authProvider as "local" | "google" | undefined) || defaultProvider;
+  return {
+    id: String(u.id),
+    name: u.username,
+    email: u.email,
+    ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}),
+    ...(provider ? { authProvider: provider } : {}),
+  };
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return handleResponse<T>(res);
 }
 
 /* ── Auth ─────────────────────────────────────────────────── */
 
 export async function signIn(email: string, password: string): Promise<DfsUser> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await handleResponse<{
-    data: { user: { id: number; username: string; email: string }; token: string };
-  }>(res);
-  setToken(data.data.token);
-  return {
-    id: String(data.data.user.id),
-    name: data.data.user.username,
-    email: data.data.user.email,
-  };
+  return acceptAuth(await postJson<AuthPayload>("/auth/login", { email, password }));
 }
 
 export async function signUp(name: string, email: string, password: string): Promise<DfsUser> {
-  const res = await fetch(`${API_BASE}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: name, email, password }),
-  });
-  const data = await handleResponse<{
-    data: { user: { id: number; username: string; email: string }; token: string };
-  }>(res);
-  setToken(data.data.token);
-  return {
-    id: String(data.data.user.id),
-    name: data.data.user.username,
-    email: data.data.user.email,
-  };
+  return acceptAuth(
+    await postJson<AuthPayload>("/auth/register", { username: name, email, password }),
+  );
 }
 
 export async function signOut(): Promise<void> {
@@ -99,204 +157,216 @@ export async function signOut(): Promise<void> {
 /* ── Google OAuth ─────────────────────────────────────────── */
 
 export async function googleLogin(credential: string): Promise<DfsUser> {
-  const res = await fetch(`${API_BASE}/auth/google`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ credential }),
-  });
-  const data = await handleResponse<{
-    data: {
-      user: { id: number; username: string; email: string; authProvider?: string; avatarUrl?: string };
-      token: string;
-    };
-  }>(res);
-  setToken(data.data.token);
-  return {
-    id: String(data.data.user.id),
-    name: data.data.user.username,
-    email: data.data.user.email,
-    ...(data.data.user.avatarUrl ? { avatarUrl: data.data.user.avatarUrl } : {}),
-    authProvider: (data.data.user.authProvider as "local" | "google") || "google",
-  };
+  return acceptAuth(await postJson<AuthPayload>("/auth/google", { credential }), "google");
 }
 
 /* ── OTP Login ────────────────────────────────────────────── */
 
 export async function requestOtp(email: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/auth/otp/request`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  await handleResponse(res);
+  await postJson("/auth/otp/request", { email });
 }
 
 export async function verifyOtp(email: string, code: string): Promise<DfsUser> {
-  const res = await fetch(`${API_BASE}/auth/otp/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, code }),
-  });
-  const data = await handleResponse<{
-    data: {
-      user: { id: number; username: string; email: string; authProvider?: string; avatarUrl?: string };
-      token: string;
-    };
-  }>(res);
-  setToken(data.data.token);
-  return {
-    id: String(data.data.user.id),
-    name: data.data.user.username,
-    email: data.data.user.email,
-    ...(data.data.user.avatarUrl ? { avatarUrl: data.data.user.avatarUrl } : {}),
-    authProvider: (data.data.user.authProvider as "local" | "google") || "local",
-  };
+  return acceptAuth(await postJson<AuthPayload>("/auth/otp/verify", { email, code }), "local");
 }
 
 /* ── Forgot / Reset Password ─────────────────────────────── */
 
 export async function forgotPassword(email: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  await handleResponse(res);
+  await postJson("/auth/forgot-password", { email });
 }
 
 export async function resetPassword(token: string, password: string): Promise<DfsUser> {
-  const res = await fetch(`${API_BASE}/auth/reset-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, password }),
-  });
-  const data = await handleResponse<{
-    data: {
-      user: { id: number; username: string; email: string; authProvider?: string; avatarUrl?: string };
-      token: string;
-    };
-  }>(res);
-  setToken(data.data.token);
-  return {
-    id: String(data.data.user.id),
-    name: data.data.user.username,
-    email: data.data.user.email,
-    ...(data.data.user.avatarUrl ? { avatarUrl: data.data.user.avatarUrl } : {}),
-    authProvider: (data.data.user.authProvider as "local" | "google") || "local",
-  };
+  return acceptAuth(
+    await postJson<AuthPayload>("/auth/reset-password", { token, password }),
+    "local",
+  );
 }
 
 /* ── Files ────────────────────────────────────────────────── */
 
-// Wire to GET /api/files
+/** Every file the user owns, across all folders. */
 export async function listFiles(): Promise<DfsFile[]> {
-  const res = await fetch(`${API_BASE}/files`, { headers: authHeaders() });
-  const data = await handleResponse<{ data: { files: DfsFile[] } }>(res);
+  const data = await authed<{ data: { files: DfsFile[] } }>("/files");
   return data.data.files;
 }
 
-// Wire to DELETE /api/files/:id
+export async function getFileDetail(id: string): Promise<FileDetail> {
+  const data = await authed<{ data: FileDetail }>(`/files/${encodeURIComponent(id)}`);
+  return data.data;
+}
+
 export async function deleteFile(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/files/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  await handleResponse(res);
+  await authed(`/files/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
-// TODO(Phase 3): Wire to POST /api/files/:id/share
-export async function createShareLink(id: string): Promise<string> {
-  return `https://dfs.io/s/${id}`;
+/* ── Folders ──────────────────────────────────────────────── */
+
+export async function listFolders(): Promise<DfsFolder[]> {
+  const data = await authed<{ data: { folders: DfsFolder[] } }>("/folders");
+  return data.data.folders;
 }
 
-/**
- * Upload file to backend.
- * The backend handles chunking and distribution natively. We simulate the stages
- * here for UI feedback since standard fetch doesn't give us granular progress on upload.
- */
-export async function uploadFile(
-  file: File | { name: string; size: number },
-  onProgress: (progress: number, stage: "encrypting" | "chunking" | "distributing") => void,
-  signal?: { cancelled: boolean },
-): Promise<DfsFile> {
-  if (!(file instanceof File)) {
-    throw new Error("Cannot upload without a valid File object");
-  }
+/** Subfolders, files and breadcrumb path of one folder (null = root). */
+export async function getFolderContents(folderId: string | null): Promise<FolderContents> {
+  const data = await authed<{ data: FolderContents }>(
+    `/folders/${folderId ? encodeURIComponent(folderId) : "root"}/contents`,
+  );
+  return data.data;
+}
 
-  // Simulate early stages
-  if (signal?.cancelled) throw new Error("cancelled");
-  onProgress(10, "encrypting");
-  await new Promise((r) => setTimeout(r, 100));
-
-  if (signal?.cancelled) throw new Error("cancelled");
-  onProgress(30, "chunking");
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const headers = authHeaders();
-  delete headers["Content-Type"]; // Let browser set multipart boundary
-
-  const res = await fetch(`${API_BASE}/files/upload`, {
+export async function createFolder(name: string, parentId: string | null): Promise<DfsFolder> {
+  const data = await authed<{ data: { folder: DfsFolder } }>("/folders", {
     method: "POST",
-    headers,
-    body: formData,
+    body: JSON.stringify({ name, parentId }),
   });
+  return data.data.folder;
+}
 
-  onProgress(70, "distributing");
-  const data = await handleResponse<{ data: { file: DfsFile } }>(res);
+export async function renameFolder(id: string, name: string): Promise<DfsFolder> {
+  const data = await authed<{ data: { folder: DfsFolder } }>(`/folders/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+  return data.data.folder;
+}
 
-  onProgress(100, "distributing");
-  return data.data.file;
+export async function deleteFolder(id: string): Promise<{ folders: number; files: number }> {
+  const data = await authed<{ data: { folders: number; files: number } }>(
+    `/folders/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+  return data.data;
+}
+
+/* ── Upload ───────────────────────────────────────────────── */
+
+export interface UploadHandle {
+  promise: Promise<DfsFile>;
+  abort: () => void;
 }
 
 /**
- * Download file from backend.
- * Reassembles chunks from nodes, decrypts, and streams to browser.
+ * Upload one file with REAL progress (XMLHttpRequest exposes upload
+ * progress; fetch does not). `onProgress` gets 0–100 while bytes are sent,
+ * then `distributing` while the server chunks the file onto nodes.
+ */
+export function uploadFile(
+  file: File,
+  opts: { folderId: string | null; relativePath?: string | undefined },
+  onProgress: (progress: number, stage: "uploading" | "distributing") => void,
+): UploadHandle {
+  const xhr = new XMLHttpRequest();
+
+  const promise = new Promise<DfsFile>((resolve, reject) => {
+    const form = new FormData();
+    if (opts.folderId) form.append("folderId", opts.folderId);
+    if (opts.relativePath) form.append("relativePath", opts.relativePath);
+    form.append("file", file);
+
+    xhr.open("POST", `${API_BASE}/files/upload`);
+    const token = getToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100), "uploading");
+    };
+    xhr.upload.onload = () => onProgress(100, "distributing");
+
+    xhr.onload = () => {
+      let data: (ApiEnvelope & { data?: { file: DfsFile } }) | null = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* non-JSON */
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data?.success) {
+        resolve(data.data!.file);
+      } else {
+        notifyUnauthorized(xhr.status, Boolean(token));
+        reject(new Error(data?.error?.message || statusMessage(xhr.status)));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error — check your connection."));
+    xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
+
+    xhr.send(form);
+  });
+
+  return { promise, abort: () => xhr.abort() };
+}
+
+/* ── Download ─────────────────────────────────────────────── */
+
+/** Pull the filename out of Content-Disposition, preferring RFC 5987 filename*. */
+function filenameFrom(disposition: string | null, fallback: string): string {
+  if (!disposition) return fallback;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1]);
+    } catch {
+      /* fall through */
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(disposition);
+  return plain?.[1] || fallback;
+}
+
+/**
+ * Download a file. The server reassembles the chunks (rebuilding a missing
+ * one from parity if needed) and sends the result back.
  */
 export async function downloadFile(
   id: string,
-  onStage: (stage: "reassembling" | "decrypting" | "ready", progress: number) => void,
+  fallbackName = "download",
+  onProgress?: (progress: number) => void,
 ): Promise<void> {
-  onStage("reassembling", 20);
-
-  const res = await fetch(`${API_BASE}/files/${id}/download`, {
-    headers: authHeaders(),
+  const res = await fetch(`${API_BASE}/files/${encodeURIComponent(id)}/download`, {
+    headers: authHeaders(false),
   });
-
   if (!res.ok) {
-    throw new Error(`Download failed (${res.status})`);
+    await handleResponse(res, true); // throws with the server's message
   }
 
-  onStage("decrypting", 70);
+  // Read the body incrementally so we can report progress
+  const total = Number(res.headers.get("Content-Length")) || 0;
+  let blob: Blob;
+  if (res.body && total && onProgress) {
+    const reader = res.body.getReader();
+    const parts: Uint8Array[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+      received += value.length;
+      onProgress(Math.round((received / total) * 100));
+    }
+    blob = new Blob(parts as BlobPart[]);
+  } else {
+    blob = await res.blob();
+  }
 
-  const blob = await res.blob();
   const url = window.URL.createObjectURL(blob);
-
-  // Extract filename from Content-Disposition header if possible
-  const disposition = res.headers.get("Content-Disposition");
-  let filename = "downloaded_file";
-  if (disposition && disposition.indexOf("filename=") !== -1) {
-    filename = disposition.split("filename=")[1]?.replace(/["']/g, "") || "downloaded_file";
-  }
-
-  onStage("ready", 100);
-
-  // Trigger download in browser
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
+  a.download = filenameFrom(res.headers.get("Content-Disposition"), fallbackName);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  window.URL.revokeObjectURL(url);
+  // Revoking synchronously can cancel the download in some browsers
+  setTimeout(() => window.URL.revokeObjectURL(url), 30_000);
 }
 
 /* ── Storage ──────────────────────────────────────────────── */
 
-// Wire to GET /api/storage
 export async function getStorage(): Promise<StorageUsage> {
-  const res = await fetch(`${API_BASE}/storage`, { headers: authHeaders() });
-  const data = await handleResponse<{ data: StorageUsage }>(res);
+  const data = await authed<{ data: StorageUsage }>("/storage");
   return data.data;
+}
+
+export async function getNodes(): Promise<StorageNode[]> {
+  const data = await authed<{ data: { nodes: StorageNode[] } }>("/nodes");
+  return data.data.nodes;
 }

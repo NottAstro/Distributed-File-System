@@ -11,6 +11,12 @@
  */
 require('dotenv').config();
 
+// Refuse to run in production with the public fallback secret — anyone
+// could forge a JWT for any user id with it.
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in production');
+}
+
 module.exports = {
   // Server settings
   port: parseInt(process.env.PORT, 10) || 3000,
@@ -45,6 +51,12 @@ module.exports = {
     pass: process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || '"upLoader" <noreply@uploader.app>',
   },
+
+  // Per-user storage quota (default 10 GB)
+  storageQuotaBytes: Number(process.env.STORAGE_QUOTA_BYTES) || 10 * 1024 * 1024 * 1024,
+
+  // Max single upload size (default 100 MB)
+  maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES) || 100 * 1024 * 1024,
 
   // Frontend URL (for reset links, OAuth redirects)
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',

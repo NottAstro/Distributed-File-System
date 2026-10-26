@@ -34,3 +34,16 @@ export function extensionOf(fileName: string): string {
   const parts = fileName.split(".");
   return parts.length > 1 ? parts.pop()!.toLowerCase() : "file";
 }
+
+/** "just now", "5 min ago", "3 h ago", "Yesterday", else a short date. */
+export function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diff = Date.now() - then;
+  const min = Math.round(diff / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} h ago`;
+  if (h < 48) return "Yesterday";
+  return formatDate(iso);
+}

@@ -33,17 +33,20 @@ async function initializeDatabase() {
 
         // Run schema.sql
         console.log('📦 Creating database and tables...');
-        const schemaSQL = fs.readFileSync(
+        // The SQL files say `distributed_fs`; swap in DB_NAME so hosted
+        // databases with a fixed name (e.g. Railway's "railway") work too.
+        const withDbName = (sql) => sql.replace(/distributed_fs/g, config.db.database);
+        const schemaSQL = withDbName(fs.readFileSync(
             path.join(__dirname, 'schema.sql'), 'utf8'
-        );
+        ));
         await connection.query(schemaSQL);
         console.log('✅ Database and tables created');
 
         // Run seed.sql
         console.log('🌱 Inserting seed data...');
-        const seedSQL = fs.readFileSync(
+        const seedSQL = withDbName(fs.readFileSync(
             path.join(__dirname, 'seed.sql'), 'utf8'
-        );
+        ));
         await connection.query(seedSQL);
         console.log('✅ Seed data inserted');
 

@@ -141,7 +141,7 @@ function RootComponent() {
       <DfsProvider>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
-        <Toaster position="top-right" />
+        <Toaster position="top-right" theme="dark" />
       </DfsProvider>
     </QueryClientProvider>
   );

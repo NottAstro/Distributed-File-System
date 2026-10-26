@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const config = require('../config');
 
 /**
  * Storage Service
@@ -49,10 +50,11 @@ const storageService = {
      * Update used_space for all nodes.
      */
     async updateAllNodeUsage() {
-        const nodes = await this.getAllNodes();
-        for (const node of nodes) {
-            await this.updateNodeUsage(node.id);
-        }
+        // One statement instead of one query per node
+        await pool.execute(
+            `UPDATE storage_nodes sn
+             SET used_space = COALESCE((SELECT SUM(c.chunk_size) FROM chunks c WHERE c.node_id = sn.id), 0)`
+        );
     },
 
     /**
@@ -68,7 +70,7 @@ const storageService = {
         );
         return {
             usedBytes: Number(rows[0].used_bytes),
-            quotaBytes: 10 * 1024 * 1024 * 1024, // 10 GB default quota
+            quotaBytes: config.storageQuotaBytes,
         };
     },
 };

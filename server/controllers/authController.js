@@ -99,8 +99,11 @@ const authController = {
                 });
             }
 
-            // Compare passwords
-            const isMatch = await User.comparePassword(password, user.password_hash);
+            // Google-only accounts have no password. bcrypt.compare() throws on a
+            // null hash, which used to surface as a 500 — treat it as a normal miss.
+            const isMatch = user.password_hash
+                ? await User.comparePassword(password, user.password_hash)
+                : false;
             if (!isMatch) {
                 return res.status(401).json({
                     success: false,

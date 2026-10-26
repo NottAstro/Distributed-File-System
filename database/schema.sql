@@ -9,14 +9,9 @@ CREATE DATABASE IF NOT EXISTS distributed_fs
 
 USE distributed_fs;
 
--- Drop existing tables to allow clean recreation with new schema
-DROP TABLE IF EXISTS replicas;
-DROP TABLE IF EXISTS chunks;
-DROP TABLE IF EXISTS files;
-DROP TABLE IF EXISTS password_reset_tokens;
-DROP TABLE IF EXISTS otp_codes;
-DROP TABLE IF EXISTS storage_nodes;
-DROP TABLE IF EXISTS users;
+-- NOTE: This file is safe to re-run. It never drops tables, so running
+-- `npm run db:init` against a live database will not delete user data.
+-- To wipe everything during local development, use database/reset.sql.
 
 -- -----------------------------------------
 -- Table: users
@@ -37,12 +32,35 @@ CREATE TABLE IF NOT EXISTS users (
 
 
 -- -----------------------------------------
+-- Table: folders
+-- Purpose: User-created folders (nested via parent_id)
+-- parent_id = 0 means the folder sits at the root. A sentinel is used
+-- instead of NULL so the UNIQUE key below prevents duplicate names at
+-- the root level too (MySQL treats NULLs as distinct in unique keys).
+-- -----------------------------------------
+CREATE TABLE IF NOT EXISTS folders (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(255) NOT NULL,
+    parent_id       INT          NOT NULL DEFAULT 0,
+    owner_id        INT          NOT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_folder_name (owner_id, parent_id, name),
+    INDEX idx_folders_parent (owner_id, parent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- -----------------------------------------
 -- Table: files
 -- Purpose: Metadata for every uploaded file
 -- One row = one file (regardless of how many chunks)
+-- folder_id NULL = file sits at the root
 -- -----------------------------------------
 CREATE TABLE IF NOT EXISTS files (
     id              INT AUTO_INCREMENT PRIMARY KEY,
+    folder_id       INT          NULL,
     original_name   VARCHAR(255) NOT NULL,
     file_size       BIGINT       NOT NULL,
     mime_type       VARCHAR(100),
@@ -53,7 +71,9 @@ CREATE TABLE IF NOT EXISTS files (
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE,
     INDEX idx_files_uploaded_by (uploaded_by),
+    INDEX idx_files_folder (uploaded_by, folder_id),
     INDEX idx_files_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

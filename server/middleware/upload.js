@@ -1,6 +1,8 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const config = require('../config');
 
 /**
  * Multer Upload Middleware
@@ -9,7 +11,7 @@ const fs = require('fs');
  * server/uploads/ before being chunked and distributed to storage nodes.
  *
  * SECURITY:
- * - Max file size: 100MB
+ * - Max file size: MAX_UPLOAD_BYTES (100MB default)
  * - uploads/ directory is gitignored
  * - Files are deleted after chunking (not kept in uploads/)
  */
@@ -25,16 +27,21 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        // Unique filename: timestamp_randomstring_originalname
-        const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        cb(null, `${uniqueSuffix}_${file.originalname}`);
+        // Random temp name — the user's filename never touches the filesystem,
+        // so long, odd or path-like names can't cause write errors or traversal.
+        cb(null, `${Date.now()}_${crypto.randomBytes(8).toString('hex')}.part`);
     },
 });
 
 const upload = multer({
     storage,
+    // Browsers send filenames as raw UTF-8. Multer's default (latin1) turns
+    // "résumé.pdf" or "照片.jpg" into mojibake.
+    defParamCharset: 'utf8',
     limits: {
-        fileSize: 100 * 1024 * 1024, // 100MB max
+        fileSize: config.maxUploadBytes,
+        files: 1,
+        fields: 10,
     },
 });
 

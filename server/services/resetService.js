@@ -62,26 +62,23 @@ const resetService = {
         // Hash the incoming token to match against DB
         const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-        // Find matching, unexpired, unused token
-        const [rows] = await pool.execute(
-            `SELECT id, user_id, expires_at 
-             FROM password_reset_tokens 
-             WHERE token_hash = ? AND used = FALSE AND expires_at > NOW()
-             LIMIT 1`,
+        // Claim the token atomically. A separate SELECT-then-UPDATE let two
+        // concurrent requests both pass the check and reuse one token.
+        const [claim] = await pool.execute(
+            `UPDATE password_reset_tokens SET used = TRUE
+             WHERE token_hash = ? AND used = FALSE AND expires_at > NOW()`,
             [tokenHash]
         );
 
-        if (rows.length === 0) {
+        if (claim.affectedRows === 0) {
             return { valid: false, reason: 'Invalid or expired reset link. Please request a new one.' };
         }
 
-        const resetToken = rows[0];
-
-        // Mark as used (single-use)
-        await pool.execute(
-            'UPDATE password_reset_tokens SET used = TRUE WHERE id = ?',
-            [resetToken.id]
+        const [rows] = await pool.execute(
+            'SELECT user_id FROM password_reset_tokens WHERE token_hash = ? LIMIT 1',
+            [tokenHash]
         );
+        const resetToken = rows[0];
 
         logger.info(`Password reset token consumed for user ID ${resetToken.user_id}`);
         return { valid: true, userId: resetToken.user_id };

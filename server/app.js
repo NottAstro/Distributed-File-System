@@ -11,6 +11,7 @@ const errorHandler = require('./middleware/errorHandler');
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const fileRoutes = require('./routes/fileRoutes');
+const folderRoutes = require('./routes/folderRoutes');
 const authenticate = require('./middleware/authMiddleware');
 const fileController = require('./controllers/fileController');
 
@@ -47,10 +48,10 @@ app.use(cors({
             }
         }
 
-        // Allow any Vercel preview deployment automatically
-        if (origin.endsWith('.vercel.app')) {
-            return callback(null, true);
-        }
+        // NOTE: a blanket `*.vercel.app` allowance used to live here. Anyone can
+        // deploy to vercel.app, so it let any site call this API. In production
+        // the frontend calls /api on its own origin (proxied), so CORS isn't
+        // needed there — list extra origins explicitly in CORS_ORIGIN instead.
 
         // Check explicit allowlist
         if (allowedOrigins.includes(origin)) {
@@ -67,12 +68,15 @@ app.use(cors({
 // Rate Limiting
 // ---------------------
 
-// Global rate limit: 100 requests per 15 minutes per IP
+// Global rate limit: 600 requests per 15 minutes per IP.
+// (100 was low enough that browsing a few folders and uploading a small
+// folder locked people out.) Uploads have their own per-user limit.
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 600,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.method === 'POST' && req.path === '/files/upload',
     message: {
         success: false,
         error: { message: 'Too many requests. Please try again later.' },
@@ -80,6 +84,7 @@ const globalLimiter = rateLimit({
 });
 
 // Strict rate limit for auth routes: 30 attempts per 15 minutes per IP
+// (OTP and password-reset limits are applied in authRoutes.js)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 30,
@@ -91,42 +96,6 @@ const authLimiter = rateLimit({
     },
 });
 
-// Upload rate limit: 20 uploads per 15 minutes per IP
-const uploadLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        error: { message: 'Upload limit reached. Please try again later.' },
-    },
-});
-
-// OTP rate limit: 3 OTP requests per 15 minutes per IP (prevent spam)
-const otpLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 3,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        error: { message: 'Too many OTP requests. Please try again in 15 minutes.' },
-    },
-});
-
-// Password reset rate limit: 3 requests per 15 minutes per IP
-const resetLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 3,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        error: { message: 'Too many reset requests. Please try again in 15 minutes.' },
-    },
-});
-
 // Apply global rate limit to all API routes
 app.use('/api', globalLimiter);
 
@@ -135,10 +104,11 @@ app.use('/api', globalLimiter);
 // ---------------------
 
 // Parse JSON request bodies (req.body will contain parsed JSON)
-app.use(express.json({ limit: '10mb' }));
+// Small limit: no JSON endpoint needs more (files go through multer)
+app.use(express.json({ limit: '100kb' }));
 
 // Parse URL-encoded form data
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Log every HTTP request to the console
 // 'dev' format: GET /api/health 200 3.451 ms
@@ -164,9 +134,13 @@ app.get('/api/health', (req, res) => {
 // NOTE: OTP and reset rate limits are applied directly in authRoutes.js
 app.use('/api/auth', authLimiter, authRoutes);
 
-// File management routes (upload route gets its own rate limit)
+// File management routes (upload rate limit lives in fileRoutes.js — it
+// must run BEFORE the upload handler, which a separate app.post() after the
+// router never did)
 app.use('/api/files', fileRoutes);
-app.post('/api/files/upload', uploadLimiter); // Additional rate limit on uploads
+
+// Folder routes
+app.use('/api/folders', folderRoutes);
 
 // Storage and node routes (protected)
 app.get('/api/storage', authenticate, fileController.getStorage);

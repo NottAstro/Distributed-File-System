@@ -17,12 +17,16 @@ function errorHandler(err, req, res, next) {
         logger.error(err.stack);
     }
 
-    const statusCode = err.statusCode || 500;
+    // Multer errors (file too large, unexpected field…) are client errors
+    let statusCode = err.statusCode || err.status || 500;
+    if (err.name === 'MulterError') {
+        statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    }
 
     res.status(statusCode).json({
         success: false,
         error: {
-            message: statusCode === 500
+            message: statusCode >= 500
                 ? 'Internal server error'      // Never leak internal details in production
                 : err.message,
             // Stack trace only in development — NEVER in production

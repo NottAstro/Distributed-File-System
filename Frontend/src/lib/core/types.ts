@@ -16,6 +16,8 @@ export interface DfsFile {
   nodes: number;
   /** e.g. "2+1 XOR parity" */
   redundancy: string;
+  /** every chunk is encrypted at rest (AES-256-GCM) */
+  encrypted: boolean;
 }
 
 export interface DfsFolder {
@@ -50,6 +52,8 @@ export interface ChunkInfo {
   node: string;
   nodeStatus: string;
   checksum: string;
+  /** "aes-256-gcm" or "none" (stored before encryption was enabled) */
+  encryption: string;
   healthy: boolean;
 }
 

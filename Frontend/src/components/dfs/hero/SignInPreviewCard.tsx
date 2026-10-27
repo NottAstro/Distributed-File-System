@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { GlassCard } from "./GlassCard";
 import { AkInput, AkPasswordInput, OrDivider } from "./HeroForms";
 import { HeroGoogleButton } from "./HeroGoogleButton";
+import { errorMessage } from "@/lib/core/api";
 
 export function SignInPreviewCard({ isActive = true }: { isActive?: boolean }) {
   const { signIn, googleSignIn } = useDfs();
@@ -18,8 +19,8 @@ export function SignInPreviewCard({ isActive = true }: { isActive?: boolean }) {
     try {
       await googleSignIn(credential);
       void navigate({ to: "/dashboard" });
-    } catch {
-      toast.error("Google sign-in failed. Please try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Google sign-in failed. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -35,8 +36,8 @@ export function SignInPreviewCard({ isActive = true }: { isActive?: boolean }) {
     try {
       await signIn(email, password);
       void navigate({ to: "/dashboard" });
-    } catch {
-      toast.error("Could not sign in. Please try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Could not sign in. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -82,7 +83,11 @@ export function SignInPreviewCard({ isActive = true }: { isActive?: boolean }) {
         </p>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <HeroGoogleButton onCredential={handleGoogleCredential} disabled={busy} isActive={isActive} />
+        <HeroGoogleButton
+          onCredential={handleGoogleCredential}
+          disabled={busy}
+          isActive={isActive}
+        />
       </div>
       <OrDivider />
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>

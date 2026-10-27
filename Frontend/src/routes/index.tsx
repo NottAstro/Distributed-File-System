@@ -8,7 +8,7 @@ import { Footer } from "@/components/dfs/Footer";
 
 const title = "upLoader — Distributed, encrypted file storage";
 const description =
-  "Upload once. upLoader splits, encrypts and distributes your files across storage nodes worldwide, then reassembles them on demand.";
+  "Upload once. upLoader splits your files, encrypts every chunk at rest and distributes them across storage nodes, then reassembles them on demand.";
 
 export const Route = createFileRoute("/")({
   head: () => ({

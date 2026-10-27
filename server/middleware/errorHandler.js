@@ -26,8 +26,11 @@ function errorHandler(err, req, res, next) {
     res.status(statusCode).json({
         success: false,
         error: {
-            message: statusCode >= 500
-                ? 'Internal server error'      // Never leak internal details in production
+            // Unexpected 5xx errors are masked (never leak internals). Errors
+            // raised on purpose with a user-facing message (expose: true, e.g.
+            // "Email delivery is not available") keep it.
+            message: statusCode >= 500 && !err.expose
+                ? 'Internal server error'
                 : err.message,
             // Stack trace only in development — NEVER in production
             ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),

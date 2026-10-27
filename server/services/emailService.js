@@ -4,15 +4,27 @@ const config = require('../config');
 const logger = require('../utils/logger');
 
 // Force Node.js to resolve IPv4 addresses first.
-// This prevents ENETUNREACH SMTP errors on environments that don't route IPv6 (like Railway).
+// This prevents ENETUNREACH SMTP errors on hosts that don't route IPv6.
 dns.setDefaultResultOrder('ipv4first');
+
 /**
  * Email Service
  *
- * Sends OTP codes and password-reset emails via SMTP.
- * In development, if real SMTP is unconfigured or fails, it automatically
- * provisions an Ethereal Email test account to safely preview emails.
+ * Sends OTP codes and password-reset emails. Delivery, in order of preference:
+ *   1. Resend HTTPS API (RESEND_API_KEY) — works on hosts that block SMTP
+ *      ports (e.g. Railway below the Pro plan)
+ *   2. SMTP (SMTP_USER + SMTP_PASS)
+ *   3. Development only: an Ethereal test inbox (preview links in the log)
  */
+
+function httpError(message, statusCode) {
+    const err = new Error(message);
+    err.statusCode = statusCode;
+    err.expose = true; // message is meant for the user
+    return err;
+}
+
+const UNAVAILABLE = 'Email delivery is not available right now. Please use another sign-in method or try again later.';
 
 let transporter = null;
 
@@ -32,10 +44,9 @@ async function getTransporter() {
             pool: true,
             maxConnections: 5,
             maxMessages: 100,
-            connectionTimeout: 5000, // 5 seconds
-            greetingTimeout: 5000,   // 5 seconds
-            socketTimeout: 5000,     // 5 seconds
-            // Force IPv4 because Railway containers often fail to route IPv6 (ENETUNREACH)
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
             family: 4,
         });
 
@@ -46,6 +57,9 @@ async function getTransporter() {
             return transporter;
         } catch (err) {
             logger.error('SMTP connection failed:', err.message);
+            if (config.nodeEnv === 'production') {
+                throw httpError(UNAVAILABLE, 503);
+            }
         }
     }
 
@@ -66,16 +80,59 @@ async function getTransporter() {
         return transporter;
     }
 
-    throw new Error('Email service is not configured');
+    throw httpError(UNAVAILABLE, 503);
 }
 
-// Fire-and-forget initialization on startup
-getTransporter().catch(err => logger.error(err.message));
+/** Send through Resend's HTTPS API (no SDK needed). */
+async function sendViaResend({ to, subject, html, text }) {
+    const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${config.resend.apiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ from: config.smtp.from, to: [to], subject, html, text }),
+        signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        throw new Error(`Resend API ${res.status}: ${detail.slice(0, 300)}`);
+    }
+}
+
+/** Deliver one message with whichever transport is configured. */
+async function deliver(message, label) {
+    const to = message.to.replace(/(.{2}).*(@.*)/, '$1***$2');
+    try {
+        if (config.resend.apiKey) {
+            await sendViaResend(message);
+        } else {
+            const mailTransporter = await getTransporter();
+            const info = await mailTransporter.sendMail({ from: config.smtp.from, ...message });
+            if (config.nodeEnv !== 'production' && nodemailer.getTestMessageUrl(info)) {
+                logger.info(`Email Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
+            }
+        }
+        logger.info(`${label} email sent to ${to}`);
+    } catch (error) {
+        logger.error(`Failed to send ${label} email to ${to}:`, error.message);
+        throw error.statusCode ? error : httpError(UNAVAILABLE, 503);
+    }
+}
 
 const emailService = {
+    /** True when this server can actually deliver email. */
+    isConfigured() {
+        return Boolean(config.resend.apiKey || (config.smtp.user && config.smtp.pass) || config.nodeEnv !== 'production');
+    },
+
+    /** Throw a clear 503 instead of failing later (or silently). */
+    assertConfigured() {
+        if (!this.isConfigured()) throw httpError(UNAVAILABLE, 503);
+    },
+
     async sendOtpEmail(to, otpCode) {
         const mailOptions = {
-            from: config.smtp.from,
             to,
             subject: 'Your upLoader Login Code',
             html: `
@@ -99,26 +156,13 @@ const emailService = {
             text: `Your upLoader login code is: ${otpCode}\n\nThis code expires in 5 minutes.\nIf you didn't request this, ignore this email.`,
         };
 
-        try {
-            const mailTransporter = await getTransporter();
-            const info = await mailTransporter.sendMail(mailOptions);
-            logger.info(`OTP email sent to ${to.replace(/(.{2}).*(@.*)/, '$1***$2')}`);
-            
-            // Log Ethereal preview URL in development
-            if (config.nodeEnv !== 'production' && nodemailer.getTestMessageUrl(info)) {
-                logger.info(`Email Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
-            }
-        } catch (error) {
-            logger.error('Failed to send OTP email:', error.message);
-            throw new Error('Failed to send email. Please try again.');
-        }
+        await deliver(mailOptions, 'Login code');
     },
 
     async sendPasswordResetEmail(to, resetToken) {
-        const resetUrl = `${config.frontendUrl}/reset-password?token=${resetToken}`;
+        const resetUrl = `${config.frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
         const mailOptions = {
-            from: config.smtp.from,
             to,
             subject: 'Reset Your upLoader Password',
             html: `
@@ -151,18 +195,7 @@ const emailService = {
             text: `Reset your upLoader password\n\nVisit this link to reset your password:\n${resetUrl}\n\nThis link expires in 15 minutes.\nIf you didn't request this, ignore this email.`,
         };
 
-        try {
-            const mailTransporter = await getTransporter();
-            const info = await mailTransporter.sendMail(mailOptions);
-            logger.info(`Password reset email sent to ${to.replace(/(.{2}).*(@.*)/, '$1***$2')}`);
-
-            if (config.nodeEnv !== 'production' && nodemailer.getTestMessageUrl(info)) {
-                logger.info(`Email Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
-            }
-        } catch (error) {
-            logger.error('Failed to send reset email:', error.message);
-            throw new Error('Failed to send email. Please try again.');
-        }
+        await deliver(mailOptions, 'Password reset');
     },
 };
 

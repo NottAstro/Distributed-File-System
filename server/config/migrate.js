@@ -43,6 +43,31 @@ async function ensureSchema(pool) {
              FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE`
         );
     }
+
+    // v4: auth hardening
+    if (!(await columnExists(pool, 'users', 'email_verified'))) {
+        logger.info('Migrating: adding users.email_verified');
+        await pool.query(
+            `ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT FALSE AFTER avatar_url`
+        );
+        // Accounts already linked to Google have a Google-verified address
+        await pool.query(`UPDATE users SET email_verified = TRUE WHERE google_id IS NOT NULL`);
+    }
+    if (!(await columnExists(pool, 'users', 'token_version'))) {
+        logger.info('Migrating: adding users.token_version');
+        await pool.query(
+            `ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0 AFTER email_verified`
+        );
+    }
+
+    // v5: chunk encryption at rest ('none' = legacy plaintext chunk)
+    if (!(await columnExists(pool, 'chunks', 'encryption'))) {
+        logger.info('Migrating: adding chunks.encryption');
+        await pool.query(
+            `ALTER TABLE chunks ADD COLUMN encryption VARCHAR(20) NOT NULL DEFAULT 'none' AFTER checksum`
+        );
+        await pool.query(`ALTER TABLE chunks ADD INDEX idx_chunks_encryption (encryption)`);
+    }
 }
 
 module.exports = { ensureSchema };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CircleAlert, CircleCheck, Download, ShieldCheck, Trash2, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Download, Lock, ShieldCheck, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatBytes, formatDateTime } from "@/lib/core/format";
 import { useDfs } from "@/lib/core/store";
@@ -53,6 +53,18 @@ export function FileDetailPanel({
       detail ? (detail.path.length ? detail.path.map((p) => p.name).join(" / ") : "My Files") : "…",
     ],
     ["Type", file.mimeType],
+    [
+      "Encryption",
+      file.encrypted ? (
+        <span key="e" className="inline-flex items-center gap-1.5 text-teal">
+          <Lock className="size-3.5" /> AES-256-GCM at rest
+        </span>
+      ) : (
+        <span key="e" className="text-amber" title="Stored before encryption was enabled">
+          Not yet encrypted
+        </span>
+      ),
+    ],
     ["Status", <StatusDot key="s" status={file.status} />],
   ];
 
@@ -117,8 +129,8 @@ export function FileDetailPanel({
             <ShieldCheck className="size-4 text-teal" /> Chunk placement
           </h3>
           <p className="mt-1 text-[13px] leading-relaxed text-[var(--ak-fog)]">
-            Split into two halves plus an XOR parity chunk on separate nodes. Any one node can fail
-            and the file is still recoverable.
+            Split into two halves plus an XOR parity chunk on separate nodes, each encrypted at
+            rest. Any one node can fail and the file is still recoverable.
           </p>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
@@ -145,7 +157,12 @@ export function FileDetailPanel({
                         <CircleAlert className="size-3.5 text-[#fca5a5]" aria-label="Missing" />
                       )}
                     </div>
-                    <p className="mt-2 text-[14px] font-medium text-white">{c.node}</p>
+                    <p className="mt-2 flex items-center gap-1.5 text-[14px] font-medium text-white">
+                      {c.node}
+                      {c.encryption !== "none" && (
+                        <Lock className="size-3 text-[var(--ak-fog)]" aria-label="Encrypted" />
+                      )}
+                    </p>
                     <p className="font-mono text-[11px] text-[var(--ak-fog)]">
                       {formatBytes(c.size)}
                     </p>

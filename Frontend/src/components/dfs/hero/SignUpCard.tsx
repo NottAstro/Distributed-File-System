@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { GlassCard } from "./GlassCard";
 import { AkInput, AkPasswordInput, OrDivider } from "./HeroForms";
 import { HeroGoogleButton } from "./HeroGoogleButton";
+import { errorMessage } from "@/lib/core/api";
 
 export function SignUpCard({ isActive = true }: { isActive?: boolean }) {
   const { signUp, googleSignIn } = useDfs();
@@ -19,8 +20,8 @@ export function SignUpCard({ isActive = true }: { isActive?: boolean }) {
     try {
       await googleSignIn(credential);
       void navigate({ to: "/dashboard" });
-    } catch {
-      toast.error("Google sign-in failed. Please try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Google sign-in failed. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -40,8 +41,8 @@ export function SignUpCard({ isActive = true }: { isActive?: boolean }) {
     try {
       await signUp(name, email, password);
       void navigate({ to: "/dashboard" });
-    } catch {
-      toast.error("Could not create account. Please try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Could not create account. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -144,7 +145,12 @@ export function SignUpCard({ isActive = true }: { isActive?: boolean }) {
       <OrDivider />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <HeroGoogleButton onCredential={handleGoogleCredential} disabled={busy} label="Continue with Google" isActive={isActive} />
+        <HeroGoogleButton
+          onCredential={handleGoogleCredential}
+          disabled={busy}
+          label="Continue with Google"
+          isActive={isActive}
+        />
       </div>
 
       <p style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "var(--ak-fog)" }}>

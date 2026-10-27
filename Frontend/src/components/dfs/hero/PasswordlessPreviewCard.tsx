@@ -5,6 +5,7 @@ import { GlassCard } from "./GlassCard";
 import { AkInput } from "./HeroForms";
 import { useDfs } from "@/lib/core/store";
 import { OtpInput } from "../OtpInput";
+import { errorMessage } from "@/lib/core/api";
 
 export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolean }) {
   const { otpRequest, otpVerify } = useDfs();
@@ -24,8 +25,8 @@ export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolea
       await otpRequest(email);
       setOtpSent(true);
       toast.success("Login code sent! Check your email.");
-    } catch {
-      toast.error("Could not send login code. Try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Could not send login code. Try again."));
     } finally {
       setBusy(false);
     }
@@ -36,8 +37,8 @@ export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolea
     try {
       await otpVerify(email, code);
       void navigate({ to: "/dashboard" });
-    } catch {
-      toast.error("Invalid or expired code. Try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Invalid or expired code. Try again."));
     } finally {
       setBusy(false);
     }
@@ -83,7 +84,10 @@ export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolea
       </div>
 
       {!otpSent ? (
-        <form onSubmit={handleOtpRequest} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <form
+          onSubmit={handleOtpRequest}
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
+        >
           <AkInput
             label="Email address"
             type="email"
@@ -132,7 +136,7 @@ export function PasswordlessPreviewCard({ isActive = true }: { isActive?: boolea
               fontSize: 12,
               cursor: "pointer",
               marginTop: 8,
-              textAlign: "center"
+              textAlign: "center",
             }}
           >
             ← Use a different email

@@ -4,6 +4,7 @@ const morgan = require('morgan');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
+const config = require('./config');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -18,50 +19,43 @@ const fileController = require('./controllers/fileController');
 // Create Express app
 const app = express();
 
-// Trust reverse proxy (needed for Rate Limiter when hosted on Railway/Vercel)
-app.set('trust proxy', 1);
+// Trust the hosting platform's reverse proxy so rate limits see the real
+// client IP (TRUST_PROXY = number of proxy hops, default 1)
+app.set('trust proxy', config.trustProxy);
 
 // ---------------------
 // Security Middleware
 // ---------------------
 
 // Helmet — sets secure HTTP headers (X-Content-Type-Options, X-Frame-Options, etc.)
-app.use(helmet());
+// crossOriginResourcePolicy is relaxed so the frontend (a different origin)
+// can read download responses.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
 // HPP — prevents HTTP Parameter Pollution attacks
 app.use(hpp());
 
-// CORS — restrict origins in production, allow all localhost in development
-const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-    : [];
+// CORS — the frontend calls this API directly (VITE_API_URL), so its origin
+// must be allowed: FRONTEND_URL, CORS_ORIGIN (list) and CORS_ORIGIN_REGEX.
+// (A blanket *.vercel.app allowance used to live here; anyone can deploy to
+// vercel.app, so it let any site call this API.)
+const allowedOrigins = new Set([config.frontendUrl, ...config.cors.origins]);
+
+function isAllowedOrigin(origin) {
+    if (allowedOrigins.has(origin)) return true;
+    if (config.cors.originRegex && config.cors.originRegex.test(origin)) return true;
+    // In development, allow any localhost/127.0.0.1 origin
+    return config.nodeEnv !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
 
 app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl)
-        if (!origin) return callback(null, true);
-
-        // In development, allow any localhost/127.0.0.1 origin
-        if (process.env.NODE_ENV !== 'production') {
-            if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-                return callback(null, true);
-            }
-        }
-
-        // NOTE: a blanket `*.vercel.app` allowance used to live here. Anyone can
-        // deploy to vercel.app, so it let any site call this API. In production
-        // the frontend calls /api on its own origin (proxied), so CORS isn't
-        // needed there — list extra origins explicitly in CORS_ORIGIN instead.
-
-        // Check explicit allowlist
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
-        
-        // Return false instead of throwing an Error to prevent 500 crashes
-        return callback(null, false);
-    },
-    credentials: true,
+    // No Origin header = same-origin, curl or server-to-server: allowed.
+    // Returning false (not an Error) avoids turning a bad origin into a 500.
+    origin: (origin, callback) => callback(null, !origin || isAllowedOrigin(origin)),
+    // Auth uses the Authorization header, not cookies
+    credentials: false,
+    exposedHeaders: ['Content-Disposition', 'Content-Length', 'RateLimit', 'RateLimit-Policy', 'Retry-After'],
+    maxAge: 600,
 }));
 
 // ---------------------
@@ -80,19 +74,6 @@ const globalLimiter = rateLimit({
     message: {
         success: false,
         error: { message: 'Too many requests. Please try again later.' },
-    },
-});
-
-// Strict rate limit for auth routes: 30 attempts per 15 minutes per IP
-// (OTP and password-reset limits are applied in authRoutes.js)
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 30,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        error: { message: 'Too many login attempts. Please try again in 15 minutes.' },
     },
 });
 
@@ -130,9 +111,8 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Authentication routes (with strict rate limiting)
-// NOTE: OTP and reset rate limits are applied directly in authRoutes.js
-app.use('/api/auth', authLimiter, authRoutes);
+// Authentication routes (each route has its own rate limit — see authRoutes.js)
+app.use('/api/auth', authRoutes);
 
 // File management routes (upload rate limit lives in fileRoutes.js — it
 // must run BEFORE the upload handler, which a separate app.post() after the

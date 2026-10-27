@@ -39,6 +39,10 @@ export interface UploadRequest {
 interface DfsContextValue {
   user: DfsUser | null;
   authReady: boolean;
+  /** sign-in methods the server supports; null until loaded (or if unreachable) */
+  authConfig: api.AuthConfig | null;
+  /** set when the server couldn't be reached to load authConfig */
+  authConfigError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -99,6 +103,8 @@ function writeJson(key: string, value: unknown) {
 export function DfsProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<DfsUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [authConfig, setAuthConfig] = useState<api.AuthConfig | null>(null);
+  const [authConfigError, setAuthConfigError] = useState<string | null>(null);
   const [files, setFiles] = useState<DfsFile[]>([]);
   const [folders, setFolders] = useState<DfsFolder[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
@@ -112,16 +118,39 @@ export function DfsProvider({ children }: { children: ReactNode }) {
   const handles = useRef(new Map<string, api.UploadHandle>());
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    setUser(readJson<DfsUser | null>(SESSION_KEY, null));
-    setDownloads(readJson<DownloadRecord[]>(DOWNLOADS_KEY, []));
-    setAuthReady(true);
-  }, []);
-
   const persist = useCallback((next: DfsUser | null) => {
     setUser(next);
     writeJson(SESSION_KEY, next);
   }, []);
+
+  useEffect(() => {
+    setDownloads(readJson<DownloadRecord[]>(DOWNLOADS_KEY, []));
+
+    // Restore the cached user for an instant first paint, then confirm the
+    // session with the server. A cached user without a token (or a token the
+    // server rejects — handled by the 401 listener) is signed out.
+    const cached = readJson<DfsUser | null>(SESSION_KEY, null);
+    if (cached && api.hasToken()) {
+      setUser(cached);
+      api
+        .getProfile()
+        .then(persist)
+        .catch(() => {
+          /* 401 → signed out by the listener; offline → keep the cached user */
+        });
+    } else if (cached) {
+      persist(null);
+    }
+    setAuthReady(true);
+
+    api
+      .getAuthConfig()
+      .then((c) => {
+        setAuthConfig(c);
+        setAuthConfigError(null);
+      })
+      .catch((e: unknown) => setAuthConfigError(api.errorMessage(e)));
+  }, [persist]);
 
   const resetData = useCallback(() => {
     handles.current.forEach((h) => h.abort());
@@ -254,6 +283,8 @@ export function DfsProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       authReady,
+      authConfig,
+      authConfigError,
       signIn: async (email, password) => persist(await api.signIn(email, password)),
       signUp: async (name, email, password) => persist(await api.signUp(name, email, password)),
       signOut: async () => {
@@ -336,6 +367,8 @@ export function DfsProvider({ children }: { children: ReactNode }) {
     [
       user,
       authReady,
+      authConfig,
+      authConfigError,
       persist,
       resetData,
       files,

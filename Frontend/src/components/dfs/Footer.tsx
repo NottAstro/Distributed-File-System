@@ -37,7 +37,8 @@ export function Footer() {
           <div>
             <Logo />
             <p className="mt-3 max-w-[220px] text-[14px] text-muted-foreground">
-              Split, encrypted and distributed storage for files that must survive anything.
+              Split, encrypted-at-rest and distributed storage for files that must survive a failed
+              node.
             </p>
           </div>
           {COLUMNS.map((col) => (

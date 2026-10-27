@@ -116,8 +116,8 @@ export function HeroSignup() {
             marginBottom: 60,
           }}
         >
-          Split, encrypted and distributed across storage nodes worldwide. Upload once. Retrieve
-          from anywhere, anytime.
+          Split, encrypted at rest and distributed across storage nodes. Upload once. Retrieve from
+          anywhere, anytime.
         </p>
 
         {/* Three floating cards or Welcome back card */}
@@ -186,54 +186,56 @@ export function HeroSignup() {
               marginTop: 20,
             }}
           >
-            {[SignInPreviewCard, SignUpCard, PasswordlessPreviewCard].map((CardComponent, index) => {
-              let offset = index - activeIndex;
-              if (offset === 2) offset = -1;
-              if (offset === -2) offset = 1;
+            {[SignInPreviewCard, SignUpCard, PasswordlessPreviewCard].map(
+              (CardComponent, index) => {
+                let offset = index - activeIndex;
+                if (offset === 2) offset = -1;
+                if (offset === -2) offset = 1;
 
-              let transform = "translate(-50%, 0) scale(1) rotate(0deg)";
-              let zIndex = 10;
-              let opacity = 1;
+                let transform = "translate(-50%, 0) scale(1) rotate(0deg)";
+                let zIndex = 10;
+                let opacity = 1;
 
-              if (offset === -1) {
-                transform = "translate(calc(-50% - 180px), 40px) scale(0.88) rotate(-5deg)";
-                zIndex = 0;
-                opacity = 0.5;
-              } else if (offset === 1) {
-                transform = "translate(calc(-50% + 180px), 40px) scale(0.88) rotate(5deg)";
-                zIndex = 0;
-                opacity = 0.5;
-              }
+                if (offset === -1) {
+                  transform = "translate(calc(-50% - 180px), 40px) scale(0.88) rotate(-5deg)";
+                  zIndex = 0;
+                  opacity = 0.5;
+                } else if (offset === 1) {
+                  transform = "translate(calc(-50% + 180px), 40px) scale(0.88) rotate(5deg)";
+                  zIndex = 0;
+                  opacity = 0.5;
+                }
 
-              return (
-                <div
-                  key={index}
-                  className={offset !== 0 ? "hidden lg:block" : ""}
-                  style={{
-                    position: "absolute",
-                    left: "50%",
-                    top: 0,
-                    transform,
-                    zIndex,
-                    opacity,
-                    transition: "all 600ms cubic-bezier(0.34, 1.56, 0.64, 1)",
-                    cursor: offset === 0 ? "default" : "pointer",
-                  }}
-                  onClick={() => {
-                    if (offset !== 0) setActiveIndex(index);
-                  }}
-                >
+                return (
                   <div
+                    key={index}
+                    className={offset !== 0 ? "hidden lg:block" : ""}
                     style={{
-                      pointerEvents: offset === 0 ? "auto" : "none",
-                      transition: "opacity 300ms ease",
+                      position: "absolute",
+                      left: "50%",
+                      top: 0,
+                      transform,
+                      zIndex,
+                      opacity,
+                      transition: "all 600ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                      cursor: offset === 0 ? "default" : "pointer",
+                    }}
+                    onClick={() => {
+                      if (offset !== 0) setActiveIndex(index);
                     }}
                   >
-                    <CardComponent isActive={offset === 0} />
+                    <div
+                      style={{
+                        pointerEvents: offset === 0 ? "auto" : "none",
+                        transition: "opacity 300ms ease",
+                      }}
+                    >
+                      <CardComponent isActive={offset === 0} />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              },
+            )}
           </div>
         )}
 

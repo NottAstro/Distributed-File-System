@@ -3,6 +3,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
+const cryptoService = require('./cryptoService');
 
 /**
  * Chunk Service
@@ -16,7 +17,13 @@ const logger = require('../utils/logger');
  * LAYOUT: every file becomes exactly 3 chunks — two halves of the data
  * plus an XOR parity chunk — so any single node can be lost and the file
  * can still be rebuilt (2+1 erasure coding).
+ *
+ * ENCRYPTION: each chunk (including parity) is encrypted at rest with
+ * AES-256-GCM before it is written (see cryptoService). Checksums are of the
+ * plaintext, so integrity is checked after decryption.
  */
+
+const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 
 const chunkService = {
     /**
@@ -54,21 +61,25 @@ const chunkService = {
         ];
 
         const chunks = [];
-        logger.info(`Erasure Coding: Split file into 2 data + 1 parity chunk`);
+        const encryption = cryptoService.schemeForNewChunks();
+        logger.info(`Erasure Coding: Split file into 2 data + 1 parity chunk (encryption: ${encryption})`);
 
         for (const item of chunksToProcess) {
-            const checksum = crypto.createHash('sha256').update(item.buffer).digest('hex');
+            const checksum = sha256(item.buffer);
+            const stored = encryption === 'none'
+                ? item.buffer
+                : cryptoService.encrypt(item.buffer, fileId, item.index);
 
             const chunkDir = path.join(item.node.storage_path, `file_${fileId}`);
             await fsp.mkdir(chunkDir, { recursive: true });
 
             const chunkPath = path.join(chunkDir, `chunk_${item.index}.bin`);
-            await fsp.writeFile(chunkPath, item.buffer);
+            await fsp.writeFile(chunkPath, stored);
 
             const [result] = await pool.execute(
-                `INSERT INTO chunks (file_id, chunk_index, chunk_size, checksum, node_id, storage_path)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [fileId, item.index, item.buffer.length, checksum, item.node.id, chunkPath]
+                `INSERT INTO chunks (file_id, chunk_index, chunk_size, checksum, encryption, node_id, storage_path)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [fileId, item.index, item.buffer.length, checksum, encryption, item.node.id, chunkPath]
             );
 
             chunks.push({
@@ -76,6 +87,7 @@ const chunkService = {
                 chunk_index: item.index,
                 chunk_size: item.buffer.length,
                 checksum,
+                encryption,
                 node_id: item.node.id,
                 node_name: item.node.node_name,
                 storage_path: chunkPath,
@@ -99,9 +111,10 @@ const chunkService = {
 
         for (const chunk of chunks) {
             try {
-                const chunkBuffer = await fsp.readFile(chunk.storage_path);
-                const checksum = crypto.createHash('sha256').update(chunkBuffer).digest('hex');
-                if (checksum !== chunk.checksum) {
+                const stored = await fsp.readFile(chunk.storage_path);
+                // Decrypt (GCM rejects tampering), then verify the plaintext
+                const chunkBuffer = cryptoService.decodeChunk(stored, chunk);
+                if (sha256(chunkBuffer) !== chunk.checksum) {
                     throw new Error("Checksum mismatch (corrupted)");
                 }
 
@@ -142,6 +155,86 @@ const chunkService = {
         }
 
         throw new Error("Critical failure: 2 or more chunks are missing. Cannot reconstruct file.");
+    },
+
+    /**
+     * Encrypt chunks that were stored before encryption existed (or while no
+     * key was configured). Safe to run while the app is serving traffic and
+     * to interrupt: each chunk is re-written atomically (temp file + rename)
+     * and only then marked encrypted, and readers detect the format from the
+     * file itself. Corrupted chunks are left alone so parity can still
+     * rebuild them on download.
+     *
+     * @returns {{ encrypted: number, skipped: number, missing: number, failed: number }}
+     */
+    async encryptExistingChunks(pool) {
+        const stats = { encrypted: 0, skipped: 0, missing: 0, failed: 0 };
+        if (!cryptoService.enabled()) return stats;
+
+        let lastId = 0;
+        for (;;) {
+            const [rows] = await pool.query(
+                `SELECT id, file_id, chunk_index, checksum, encryption, storage_path
+                 FROM chunks WHERE encryption = 'none' AND id > ? ORDER BY id LIMIT 100`,
+                [lastId]
+            );
+            if (rows.length === 0) break;
+
+            for (const chunk of rows) {
+                lastId = chunk.id;
+                try {
+                    const stored = await fsp.readFile(chunk.storage_path);
+
+                    // Already encrypted (e.g. by another instance) — just record it
+                    if (cryptoService.looksEncrypted(stored)) {
+                        try {
+                            if (sha256(cryptoService.decrypt(stored, chunk.file_id, chunk.chunk_index)) === chunk.checksum) {
+                                await pool.execute(`UPDATE chunks SET encryption = ? WHERE id = ?`, [cryptoService.SCHEME, chunk.id]);
+                                stats.encrypted++;
+                                continue;
+                            }
+                        } catch {
+                            /* plaintext that happens to start with the header bytes */
+                        }
+                    }
+
+                    if (sha256(stored) !== chunk.checksum) {
+                        logger.warn(`Encrypt migration: chunk ${chunk.id} fails its checksum — left as is`);
+                        stats.skipped++;
+                        continue;
+                    }
+
+                    const tmpPath = `${chunk.storage_path}.enc-tmp`;
+                    await fsp.writeFile(tmpPath, cryptoService.encrypt(stored, chunk.file_id, chunk.chunk_index));
+
+                    // The file may have been deleted while we worked
+                    const [still] = await pool.execute('SELECT id FROM chunks WHERE id = ?', [chunk.id]);
+                    if (still.length === 0) {
+                        await fsp.rm(tmpPath, { force: true });
+                        continue;
+                    }
+
+                    await fsp.rename(tmpPath, chunk.storage_path);
+                    const [updated] = await pool.execute(
+                        `UPDATE chunks SET encryption = ? WHERE id = ?`,
+                        [cryptoService.SCHEME, chunk.id]
+                    );
+                    if (updated.affectedRows === 0) {
+                        await fsp.rm(chunk.storage_path, { force: true }); // deleted mid-flight
+                        continue;
+                    }
+                    stats.encrypted++;
+                } catch (err) {
+                    if (err.code === 'ENOENT') {
+                        stats.missing++;
+                    } else {
+                        stats.failed++;
+                        logger.warn(`Encrypt migration: chunk ${chunk.id} failed: ${err.message}`);
+                    }
+                }
+            }
+        }
+        return stats;
     },
 
     /**

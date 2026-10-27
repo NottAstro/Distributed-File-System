@@ -25,46 +25,52 @@ const logger = require('../utils/logger');
 
 const client = new OAuth2Client(config.google.clientId);
 
+function httpError(message, statusCode) {
+    const err = new Error(message);
+    err.statusCode = statusCode;
+    err.expose = true; // message is meant for the user
+    return err;
+}
+
 const googleAuthService = {
     /**
      * Verify a Google ID token and extract user information.
      *
      * @param {string} idToken - The ID token from Google Sign-In (credential)
      * @returns {{ googleId: string, email: string, name: string, picture: string, emailVerified: boolean }}
-     * @throws {Error} If token is invalid, expired, or audience doesn't match
+     * @throws 503 if Google sign-in isn't configured, 401 if the token is invalid
      */
     async verifyIdToken(idToken) {
+        if (!config.google.clientId) {
+            throw httpError('Google sign-in is not configured on this server.', 503);
+        }
+
+        let payload;
         try {
             const ticket = await client.verifyIdToken({
                 idToken,
                 audience: config.google.clientId,  // Ensures token was issued for our app
             });
-
-            const payload = ticket.getPayload();
-
-            // Double-check audience (defense in depth)
-            if (payload.aud !== config.google.clientId) {
-                throw new Error('Token audience mismatch');
-            }
-
-            // Verify issuer
-            if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
-                throw new Error('Token issuer mismatch');
-            }
-
-            logger.info(`Google token verified for ${payload.email}`);
-
-            return {
-                googleId: payload.sub,              // Unique Google user ID
-                email: payload.email,               // User's email
-                name: payload.name || payload.email, // Display name (fallback to email)
-                picture: payload.picture || null,    // Profile picture URL
-                emailVerified: payload.email_verified || false,
-            };
+            payload = ticket.getPayload();
         } catch (error) {
-            logger.error('Google token verification failed:', error.message);
-            throw new Error('Invalid Google credentials. Please try again.');
+            // Expired token, wrong audience (frontend and backend use different
+            // client IDs), clock skew, tampering…
+            logger.warn('Google token verification failed:', error.message);
+            throw httpError('Google sign-in could not be verified. Please try again.', 401);
         }
+
+        // Verify issuer (defense in depth — the library checks it too)
+        if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
+            throw httpError('Google sign-in could not be verified. Please try again.', 401);
+        }
+
+        return {
+            googleId: payload.sub,                // Unique Google user ID
+            email: payload.email,                 // User's email
+            name: payload.name || payload.email,  // Display name (fallback to email)
+            picture: payload.picture || null,     // Profile picture URL
+            emailVerified: payload.email_verified === true,
+        };
     },
 };
 

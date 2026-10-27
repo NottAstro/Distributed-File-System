@@ -10,14 +10,35 @@
  * ──────────────────────────────────────────────────
  */
 import { useEffect, useRef, useState } from "react";
+import { useDfs } from "@/lib/core/store";
 
-/** The Google Client ID — reads from Vite env var */
-const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "";
+/**
+ * The Google client ID comes from the server (/api/auth/config), so the
+ * frontend and backend can never disagree about it. VITE_GOOGLE_CLIENT_ID
+ * is only a fallback for older backends.
+ */
+const ENV_CLIENT_ID =
+  (import.meta as { env?: Record<string, string | undefined> }).env?.["VITE_GOOGLE_CLIENT_ID"] ||
+  "";
+
+export function useGoogleClientId(): string | null {
+  const { authConfig } = useDfs();
+  if (authConfig) return authConfig.googleClientId;
+  return ENV_CLIENT_ID || null;
+}
 
 interface GoogleSignInButtonProps {
   onCredential: (credential: string) => void;
   disabled?: boolean;
   text?: "signin_with" | "signup_with" | "continue_with";
+  /** custom visible label (overrides `text`) */
+  label?: string;
+  /**
+   * Google keeps ONE global callback per page. When several buttons are
+   * mounted (the landing page's card carousel), only the active one may
+   * initialize, or the last one to mount would receive every sign-in.
+   */
+  isActive?: boolean;
 }
 
 // Extend window type for Google's GSI library
@@ -72,28 +93,36 @@ export function GoogleSignInButton({
   onCredential,
   disabled = false,
   text = "signin_with",
+  label,
+  isActive = true,
 }: GoogleSignInButtonProps) {
+  const clientId = useGoogleClientId();
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [scriptFailed, setScriptFailed] = useState(false);
   const [resetKey, setResetKey] = useState(0);
-  
+
   const callbackRef = useRef(onCredential);
   callbackRef.current = onCredential;
   const textRef = useRef(text);
   textRef.current = text;
 
-  // 1. Load the Google script exactly once
+  // 1. Load the Google script exactly once per page
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
+    if (!clientId || !isActive) return;
 
     let isMounted = true;
     const scriptId = "google-gsi-script";
+    const started = Date.now();
 
     function pollGoogle() {
       if (!isMounted) return;
       if (window.google?.accounts?.id) {
         setScriptLoaded(true);
+      } else if (Date.now() - started > 15000) {
+        // Blocked by an extension / network — don't spin forever
+        setScriptFailed(true);
       } else {
         setTimeout(pollGoogle, 100);
       }
@@ -105,6 +134,7 @@ export function GoogleSignInButton({
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
       script.defer = true;
+      script.onerror = () => isMounted && setScriptFailed(true);
       document.head.appendChild(script);
     }
 
@@ -113,15 +143,14 @@ export function GoogleSignInButton({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [clientId, isActive]);
 
-  // 2. Render the button when script is loaded OR when resetKey changes
+  // 2. Initialize + render Google's (invisible) button
   useEffect(() => {
-    if (!scriptLoaded || !containerRef.current) return;
+    if (!clientId || !scriptLoaded || !containerRef.current || !isActive) return;
 
-    // We must initialize before rendering
     window.google!.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
+      client_id: clientId,
       callback: (response: { credential: string }) => {
         callbackRef.current(response.credential);
       },
@@ -133,35 +162,38 @@ export function GoogleSignInButton({
       type: "standard",
       theme: "filled_black",
       size: "large",
-      width: 400,
+      width: Math.min(400, Math.max(200, containerRef.current.offsetWidth || 400)),
       text: textRef.current,
       shape: "rectangular",
       logo_alignment: "left",
     });
 
     setReady(true);
-  }, [scriptLoaded, resetKey]);
+  }, [clientId, scriptLoaded, resetKey, isActive]);
 
-  // 3. If user closes the popup, the window regains focus. 
-  // We increment resetKey to completely destroy and recreate the DOM node, 
-  // wiping Google's "disabled" cooldown state from the element.
+  // 3. If the user closes Google's popup, the window regains focus. Recreate
+  // the DOM node to clear Google's "disabled" cooldown on the old element.
   useEffect(() => {
-    const handleFocus = () => {
-      setResetKey((prev) => prev + 1);
-    };
+    const handleFocus = () => setResetKey((prev) => prev + 1);
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
-  if (!GOOGLE_CLIENT_ID) {
-    return null;
-  }
+  // Not configured on the server → no button at all
+  if (!clientId) return null;
+
+  const visibleLabel = label || LABEL_MAP[textRef.current] || "Sign in with Google";
 
   return (
     <div
       key={resetKey}
       className="relative w-full"
       style={{ height: 44, overflow: "hidden", borderRadius: 8 }}
+      title={
+        scriptFailed
+          ? "Google sign-in couldn't load (blocked by the browser or network)"
+          : undefined
+      }
     >
       {/* Hidden real Google button — sits on top for click handling */}
       <div
@@ -197,10 +229,12 @@ export function GoogleSignInButton({
           zIndex: 1,
         }}
       >
-        {ready ? (
+        {scriptFailed ? (
+          <span>Google sign-in unavailable</span>
+        ) : ready ? (
           <>
             <GoogleLogo size={18} />
-            {LABEL_MAP[textRef.current] || "Sign in with Google"}
+            {visibleLabel}
           </>
         ) : (
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--ak-moon)] border-t-transparent" />

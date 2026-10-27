@@ -5,6 +5,8 @@ const logger = require('./server/utils/logger');
 const { ensureSchema } = require('./server/config/migrate');
 const otpService = require('./server/services/otpService');
 const resetService = require('./server/services/resetService');
+const chunkService = require('./server/services/chunkService');
+const cryptoService = require('./server/services/cryptoService');
 
 async function startServer() {
     try {
@@ -27,7 +29,21 @@ async function startServer() {
         app.listen(config.port, () => {
             logger.success(`DFS Server running on http://localhost:${config.port}`);
             logger.info(`Environment: ${config.nodeEnv}`);
+            logger.info(`Chunk encryption at rest: ${cryptoService.enabled() ? 'AES-256-GCM' : 'OFF (set ENCRYPTION_KEY)'}`);
             logger.info('Press Ctrl+C to stop\n');
+
+            // Encrypt chunks stored before encryption was enabled, in the
+            // background (set ENCRYPT_EXISTING_ON_BOOT=false to skip)
+            if (cryptoService.enabled() && process.env.ENCRYPT_EXISTING_ON_BOOT !== 'false') {
+                chunkService
+                    .encryptExistingChunks(pool)
+                    .then((s) => {
+                        if (s.encrypted || s.skipped || s.missing || s.failed) {
+                            logger.info(`Encrypt migration: ${JSON.stringify(s)}`);
+                        }
+                    })
+                    .catch((e) => logger.error(`Encrypt migration failed: ${e.message}`));
+            }
         });
 
     } catch (error) {

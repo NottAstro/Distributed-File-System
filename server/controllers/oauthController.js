@@ -1,113 +1,79 @@
-const jwt = require('jsonwebtoken');
-const { validationResult } = require('express-validator');
 const User = require('../models/User');
-const config = require('../config');
 const logger = require('../utils/logger');
 const googleAuthService = require('../services/googleAuthService');
 const otpService = require('../services/otpService');
 const emailService = require('../services/emailService');
 const resetService = require('../services/resetService');
+const { authPayload } = require('../utils/token');
+const { rejectInvalid } = require('../utils/validation');
 
-/**
- * Generate a signed JWT.
- * Payload contains only id + username — never secrets.
- */
-function generateToken(user) {
-    return jwt.sign(
-        { id: user.id, username: user.username },
-        config.jwt.secret,
-        { expiresIn: config.jwt.expiresIn }
-    );
-}
+const mask = (email) => email.replace(/(.{2}).*(@.*)/, '$1***$2');
 
 const oauthController = {
     // ─────────────────────────────────────────────────
-    // GOOGLE OAUTH
+    // GOOGLE
     // ─────────────────────────────────────────────────
 
     /**
      * POST /api/auth/google
-     * Receives a Google ID token from the frontend, verifies it server-side,
-     * creates or finds the user, and returns a JWT.
-     *
-     * Flow:
-     * 1. Frontend uses Google Identity Services → gets credential (ID token)
-     * 2. Frontend sends ID token to this endpoint
-     * 3. We verify it with Google's servers (signature, audience, issuer)
-     * 4. If email exists with local auth → auto-link Google account
-     * 5. If new email → create new user
-     * 6. Return JWT
+     * Receives a Google ID token from Google Identity Services, verifies it
+     * server-side, finds/links/creates the user, and returns a JWT.
      */
     async googleLogin(req, res, next) {
         try {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({
-                    success: false,
-                    error: { message: 'Validation failed', details: errors.array() },
-                });
-            }
+            if (rejectInvalid(req, res)) return;
 
-            const { credential } = req.body;
-
-            // Step 1: Verify the ID token with Google
-            const googleUser = await googleAuthService.verifyIdToken(credential);
+            const googleUser = await googleAuthService.verifyIdToken(req.body.credential);
 
             if (!googleUser.emailVerified) {
                 return res.status(401).json({
                     success: false,
-                    error: { message: 'Google email is not verified.' },
+                    error: { message: 'Your Google account email is not verified.' },
                 });
             }
 
-            // Step 2: Check if user exists by Google ID
+            // 1. Already linked
             let user = await User.findByGoogleId(googleUser.googleId);
 
             if (!user) {
-                // Step 3: Check if email already exists (local account)
-                const existingUser = await User.findByEmail(googleUser.email);
-
-                if (existingUser) {
-                    // Auto-link Google to existing local account
-                    await User.linkGoogleAccount(existingUser.id, googleUser.googleId, googleUser.picture);
-                    user = await User.findById(existingUser.id);
-                    logger.info(`Google account linked to existing user: ${existingUser.username}`);
+                const existing = await User.findByEmail(googleUser.email);
+                if (existing) {
+                    // 2. Same email as an existing account → link (see the
+                    //    pre-hijacking protection in User.linkGoogleAccount)
+                    const { securedUnverifiedAccount } = await User.linkGoogleAccount(
+                        existing,
+                        googleUser.googleId,
+                        googleUser.picture
+                    );
+                    if (securedUnverifiedAccount) {
+                        logger.warn(`Google linked to unverified account ${existing.id}: password cleared, sessions revoked`);
+                    } else {
+                        logger.info(`Google account linked to existing user ${existing.id}`);
+                    }
+                    user = await User.findById(existing.id);
                 } else {
-                    // Create a new user from Google profile
+                    // 3. New user
                     user = await User.createFromGoogle(
                         googleUser.googleId,
                         googleUser.email,
                         googleUser.name,
                         googleUser.picture
                     );
-                    logger.success(`New Google user registered: ${googleUser.name} (${googleUser.email})`);
+                    logger.success(`New Google user registered: id ${user.id}`);
                 }
             }
-
-            // Step 4: Generate JWT
-            const token = generateToken(user);
 
             res.status(200).json({
                 success: true,
                 message: 'Google login successful',
-                data: {
-                    user: {
-                        id: user.id,
-                        username: user.username,
-                        email: user.email,
-                        authProvider: user.auth_provider,
-                        avatarUrl: user.avatar_url,
-                    },
-                    token,
-                },
+                data: authPayload(user),
             });
 
         } catch (error) {
-            // Handle duplicate key errors gracefully
             if (error.code === 'ER_DUP_ENTRY') {
                 return res.status(409).json({
                     success: false,
-                    error: { message: 'An account with this email already exists.' },
+                    error: { message: 'This Google account is already linked to another user.' },
                 });
             }
             next(error);
@@ -115,44 +81,35 @@ const oauthController = {
     },
 
     // ─────────────────────────────────────────────────
-    // OTP LOGIN
+    // EMAIL CODE (OTP)
     // ─────────────────────────────────────────────────
 
     /**
      * POST /api/auth/otp/request
-     * Generates a 6-digit OTP, stores it (hashed), and emails it.
-     *
-     * SECURITY: Always returns success — does NOT reveal whether email exists.
-     * This prevents email enumeration attacks.
+     * Emails a 6-digit code. Always answers the same way whether or not the
+     * account exists (prevents email enumeration). Fails loudly (503) only
+     * when email delivery itself is broken, so users aren't left waiting.
      */
     async requestOtp(req, res, next) {
         try {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({
-                    success: false,
-                    error: { message: 'Validation failed', details: errors.array() },
-                });
-            }
+            if (rejectInvalid(req, res)) return;
+            emailService.assertConfigured();
 
             const { email } = req.body;
-
-            // Check if user exists — but don't reveal this to the client
             const user = await User.findByEmail(email);
 
             if (user) {
-                // User exists → generate and send OTP
-                const code = await otpService.generateAndStore(email, 'login');
+                // Codes are stored against the account's stored address so
+                // verify (which looks the user up the same way) matches.
+                const code = await otpService.generateAndStore(user.email, 'login');
                 await emailService.sendOtpEmail(email, code);
             } else {
-                // User doesn't exist — still return success (anti-enumeration)
-                logger.info(`OTP requested for non-existent email: ${email.replace(/(.{2}).*(@.*)/, '$1***$2')}`);
+                logger.info(`OTP requested for unknown email: ${mask(email)}`);
             }
 
-            // SECURITY: Same response regardless of email existence
             res.status(200).json({
                 success: true,
-                message: 'If an account exists with this email, a login code has been sent.',
+                message: 'If an account exists for this email, a login code has been sent.',
             });
 
         } catch (error) {
@@ -162,23 +119,23 @@ const oauthController = {
 
     /**
      * POST /api/auth/otp/verify
-     * Verifies the OTP code and returns a JWT if valid.
+     * Verifies the code and returns a JWT. A correct code proves the user
+     * controls the inbox, so the address becomes verified.
      */
     async verifyOtp(req, res, next) {
         try {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({
+            if (rejectInvalid(req, res)) return;
+
+            const { email, code } = req.body;
+            const user = await User.findByEmail(email);
+            if (!user) {
+                return res.status(401).json({
                     success: false,
-                    error: { message: 'Validation failed', details: errors.array() },
+                    error: { message: 'That code is invalid or has expired. Please request a new one.' },
                 });
             }
 
-            const { email, code } = req.body;
-
-            // Verify the OTP
-            const result = await otpService.verify(email, code, 'login');
-
+            const result = await otpService.verify(user.email, code, 'login');
             if (!result.valid) {
                 return res.status(401).json({
                     success: false,
@@ -186,31 +143,13 @@ const oauthController = {
                 });
             }
 
-            // OTP is valid — find the user and issue JWT
-            const user = await User.findByEmail(email);
-            if (!user) {
-                return res.status(401).json({
-                    success: false,
-                    error: { message: 'Account not found.' },
-                });
-            }
-
-            logger.info(`User logged in via OTP: ${user.username}`);
-            const token = generateToken(user);
+            await User.markEmailVerified(user.id);
+            logger.info(`User logged in via email code: id ${user.id}`);
 
             res.status(200).json({
                 success: true,
-                message: 'OTP login successful',
-                data: {
-                    user: {
-                        id: user.id,
-                        username: user.username,
-                        email: user.email,
-                        authProvider: user.auth_provider,
-                        avatarUrl: user.avatar_url,
-                    },
-                    token,
-                },
+                message: 'Login successful',
+                data: authPayload(await User.findById(user.id)),
             });
 
         } catch (error) {
@@ -219,45 +158,32 @@ const oauthController = {
     },
 
     // ─────────────────────────────────────────────────
-    // FORGOT PASSWORD / RESET PASSWORD
+    // FORGOT / RESET PASSWORD
     // ─────────────────────────────────────────────────
 
     /**
      * POST /api/auth/forgot-password
-     * Generates a reset token and sends a reset link via email.
-     *
-     * SECURITY: Always returns success — does NOT reveal whether email exists.
+     * Emails a reset link. Same response whether or not the account exists.
+     * Google-only accounts get a link too: it lets them add a password.
      */
     async forgotPassword(req, res, next) {
         try {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({
-                    success: false,
-                    error: { message: 'Validation failed', details: errors.array() },
-                });
-            }
+            if (rejectInvalid(req, res)) return;
+            emailService.assertConfigured();
 
             const { email } = req.body;
             const user = await User.findByEmail(email);
 
             if (user) {
-                // Check if user has a password (Google-only users can't reset)
-                if (user.auth_provider === 'google' && !user.password_hash) {
-                    // Still return success (anti-enumeration), but log it
-                    logger.info(`Password reset attempted for Google-only user: ${email}`);
-                } else {
-                    const token = await resetService.createResetToken(user.id);
-                    await emailService.sendPasswordResetEmail(email, token);
-                }
+                const token = await resetService.createResetToken(user.id);
+                await emailService.sendPasswordResetEmail(email, token);
             } else {
-                logger.info(`Password reset requested for non-existent email: ${email.replace(/(.{2}).*(@.*)/, '$1***$2')}`);
+                logger.info(`Password reset requested for unknown email: ${mask(email)}`);
             }
 
-            // SECURITY: Same response regardless
             res.status(200).json({
                 success: true,
-                message: 'If an account exists with this email, a password reset link has been sent.',
+                message: 'If an account exists for this email, a password reset link has been sent.',
             });
 
         } catch (error) {
@@ -267,22 +193,14 @@ const oauthController = {
 
     /**
      * POST /api/auth/reset-password
-     * Verifies the reset token and updates the user's password.
-     * Returns a fresh JWT so the user is logged in after reset.
+     * Consumes the single-use token, sets the new password, signs out every
+     * other session, and returns a fresh JWT.
      */
     async resetPassword(req, res, next) {
         try {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({
-                    success: false,
-                    error: { message: 'Validation failed', details: errors.array() },
-                });
-            }
+            if (rejectInvalid(req, res)) return;
 
             const { token, password } = req.body;
-
-            // Verify and consume the reset token (single-use)
             const result = await resetService.verifyAndConsume(token);
 
             if (!result.valid) {
@@ -292,34 +210,21 @@ const oauthController = {
                 });
             }
 
-            // Update the password
-            await User.updatePassword(result.userId, password);
-
-            // Fetch user for JWT
+            await User.resetPassword(result.userId, password);
             const user = await User.findById(result.userId);
             if (!user) {
                 return res.status(404).json({
                     success: false,
-                    error: { message: 'User not found.' },
+                    error: { message: 'This account no longer exists.' },
                 });
             }
 
-            logger.success(`Password reset successful for user: ${user.username}`);
-            const jwtToken = generateToken(user);
+            logger.success(`Password reset for user ${user.id}; other sessions revoked`);
 
             res.status(200).json({
                 success: true,
-                message: 'Password reset successful. You are now logged in.',
-                data: {
-                    user: {
-                        id: user.id,
-                        username: user.username,
-                        email: user.email,
-                        authProvider: user.auth_provider,
-                        avatarUrl: user.avatar_url,
-                    },
-                    token: jwtToken,
-                },
+                message: 'Password updated. You are now signed in.',
+                data: authPayload(user),
             });
 
         } catch (error) {

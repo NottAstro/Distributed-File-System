@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS users (
     google_id       VARCHAR(255) UNIQUE,
     auth_provider   ENUM('local', 'google') DEFAULT 'local',
     avatar_url      VARCHAR(500),
+    email_verified  BOOLEAN      NOT NULL DEFAULT FALSE,
+    token_version   INT          NOT NULL DEFAULT 0,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -108,6 +110,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     chunk_index     INT          NOT NULL,
     chunk_size      INT          NOT NULL,
     checksum        VARCHAR(64),
+    encryption      VARCHAR(20)  NOT NULL DEFAULT 'none',   -- 'aes-256-gcm' when encrypted at rest
     node_id         INT          NOT NULL,
     storage_path    VARCHAR(500) NOT NULL,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

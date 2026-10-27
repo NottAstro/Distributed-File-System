@@ -20,10 +20,19 @@ import type {
  * Authorization: Bearer <token> header.
  */
 
-const isProd = (import.meta as any).env?.PROD;
-// Force the use of the local proxy (/api) in production to bypass CORS issues,
-// otherwise use VITE_API_URL for local development if specified.
-const API_BASE = isProd ? "/api" : (import.meta as any).env?.VITE_API_URL || "/api";
+/**
+ * Where the API lives. Set VITE_API_URL at build time to the backend's
+ * public URL, e.g. https://api.example.com/api — the browser calls it
+ * directly (the backend allows this site's origin via CORS).
+ *
+ * Without it, "/api" on this site is used (the Vite dev proxy locally).
+ * Production used to rely on a vercel.json rewrite to a hard-coded Railway
+ * host; that rewrite isn't part of this app's Vercel build output, and
+ * proxying uploads through Vercel functions caps them at ~4.5 MB anyway.
+ */
+const API_BASE = (
+  (import.meta as { env?: Record<string, string | undefined> }).env?.["VITE_API_URL"] || "/api"
+).replace(/\/+$/, "");
 
 const SESSION_TOKEN_KEY = "dfs.token";
 
@@ -46,6 +55,10 @@ function setToken(token: string | null): void {
   }
 }
 
+export function hasToken(): boolean {
+  return Boolean(getToken());
+}
+
 /** Build headers with auth token */
 function authHeaders(json = true): Record<string, string> {
   const headers: Record<string, string> = json ? { "Content-Type": "application/json" } : {};
@@ -63,8 +76,23 @@ function notifyUnauthorized(status: number, hadToken: boolean) {
   }
 }
 
+/** An error from the API, carrying the HTTP status (0 = never reached it). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+const UNREACHABLE = "Can't reach the server. Check your connection and try again.";
+
 /** Friendly message for statuses that usually come back as HTML from a proxy. */
 function statusMessage(status: number): string {
+  if (status === 404)
+    return "The server couldn't handle this request. It may be misconfigured or down.";
   if (status === 413) return "File is too large for the server.";
   if (status === 429) return "Too many requests. Please wait a moment and try again.";
   if (status === 502 || status === 503 || status === 504)
@@ -72,8 +100,17 @@ function statusMessage(status: number): string {
   return `Request failed (${status})`;
 }
 
+/** fetch() that turns network/CORS failures into a readable ApiError. */
+async function request(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${API_BASE}${path}`, init);
+  } catch {
+    throw new ApiError(UNREACHABLE, 0);
+  }
+}
+
 /**
- * Shared response handler — throws on error.
+ * Shared response handler — throws ApiError on failure.
  * Tolerates non-JSON bodies (proxy error pages), which used to surface as
  * "Unexpected token '<'" instead of a useful message.
  */
@@ -88,49 +125,47 @@ async function handleResponse<T>(res: Response, hadToken = false): Promise<T> {
   }
   if (!res.ok || !data?.success) {
     notifyUnauthorized(res.status, hadToken);
-    throw new Error(data?.error?.message || statusMessage(res.status));
+    throw new ApiError(data?.error?.message || statusMessage(res.status), res.status);
   }
   return data as T;
 }
 
 /** Authenticated JSON request. */
 async function authed<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await request(path, {
     ...init,
     headers: { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) },
   });
   return handleResponse<T>(res, true);
 }
 
-type AuthPayload = {
-  data: {
-    user: {
-      id: number;
-      username: string;
-      email: string;
-      authProvider?: string;
-      avatarUrl?: string;
-    };
-    token: string;
-  };
+type ServerUser = {
+  id: number;
+  username: string;
+  email: string;
+  authProvider?: string;
+  avatarUrl?: string | null;
 };
+type AuthPayload = { data: { user: ServerUser; token: string } };
 
-/** Store the token and map the server user to the client shape. */
-function acceptAuth(data: AuthPayload, defaultProvider?: "local" | "google"): DfsUser {
-  setToken(data.data.token);
-  const u = data.data.user;
-  const provider = (u.authProvider as "local" | "google" | undefined) || defaultProvider;
+function toDfsUser(u: ServerUser): DfsUser {
   return {
     id: String(u.id),
     name: u.username,
     email: u.email,
     ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}),
-    ...(provider ? { authProvider: provider } : {}),
+    authProvider: u.authProvider === "google" ? "google" : "local",
   };
 }
 
+/** Store the token and map the server user to the client shape. */
+function acceptAuth(data: AuthPayload): DfsUser {
+  setToken(data.data.token);
+  return toDfsUser(data.data.user);
+}
+
 async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await request(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -139,6 +174,25 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 /* ── Auth ─────────────────────────────────────────────────── */
+
+export interface AuthConfig {
+  /** null = Google sign-in isn't configured on the server */
+  googleClientId: string | null;
+  /** false = the server can't send email (no codes / reset links) */
+  emailEnabled: boolean;
+}
+
+/** Which sign-in methods the server supports. */
+export async function getAuthConfig(): Promise<AuthConfig> {
+  const res = await request("/auth/config", { method: "GET" });
+  return (await handleResponse<{ data: AuthConfig }>(res)).data;
+}
+
+/** The signed-in user, straight from the server (validates the session). */
+export async function getProfile(): Promise<DfsUser> {
+  const data = await authed<{ data: { user: ServerUser } }>("/auth/profile");
+  return toDfsUser(data.data.user);
+}
 
 export async function signIn(email: string, password: string): Promise<DfsUser> {
   return acceptAuth(await postJson<AuthPayload>("/auth/login", { email, password }));
@@ -154,20 +208,20 @@ export async function signOut(): Promise<void> {
   setToken(null);
 }
 
-/* ── Google OAuth ─────────────────────────────────────────── */
+/* ── Google ───────────────────────────────────────────────── */
 
 export async function googleLogin(credential: string): Promise<DfsUser> {
-  return acceptAuth(await postJson<AuthPayload>("/auth/google", { credential }), "google");
+  return acceptAuth(await postJson<AuthPayload>("/auth/google", { credential }));
 }
 
-/* ── OTP Login ────────────────────────────────────────────── */
+/* ── Email code (OTP) ─────────────────────────────────────── */
 
 export async function requestOtp(email: string): Promise<void> {
   await postJson("/auth/otp/request", { email });
 }
 
 export async function verifyOtp(email: string, code: string): Promise<DfsUser> {
-  return acceptAuth(await postJson<AuthPayload>("/auth/otp/verify", { email, code }), "local");
+  return acceptAuth(await postJson<AuthPayload>("/auth/otp/verify", { email, code }));
 }
 
 /* ── Forgot / Reset Password ─────────────────────────────── */
@@ -177,10 +231,17 @@ export async function forgotPassword(email: string): Promise<void> {
 }
 
 export async function resetPassword(token: string, password: string): Promise<DfsUser> {
-  return acceptAuth(
-    await postJson<AuthPayload>("/auth/reset-password", { token, password }),
-    "local",
-  );
+  return acceptAuth(await postJson<AuthPayload>("/auth/reset-password", { token, password }));
+}
+
+/** User-facing message for any error thrown by this module. */
+export function errorMessage(
+  err: unknown,
+  fallback = "Something went wrong. Please try again.",
+): string {
+  if (err instanceof ApiError) return err.message;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
 }
 
 /* ── Files ────────────────────────────────────────────────── */
@@ -284,10 +345,10 @@ export function uploadFile(
         resolve(data.data!.file);
       } else {
         notifyUnauthorized(xhr.status, Boolean(token));
-        reject(new Error(data?.error?.message || statusMessage(xhr.status)));
+        reject(new ApiError(data?.error?.message || statusMessage(xhr.status), xhr.status));
       }
     };
-    xhr.onerror = () => reject(new Error("Network error — check your connection."));
+    xhr.onerror = () => reject(new ApiError(UNREACHABLE, 0));
     xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
 
     xhr.send(form);
@@ -322,7 +383,7 @@ export async function downloadFile(
   fallbackName = "download",
   onProgress?: (progress: number) => void,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/files/${encodeURIComponent(id)}/download`, {
+  const res = await request(`/files/${encodeURIComponent(id)}/download`, {
     headers: authHeaders(false),
   });
   if (!res.ok) {

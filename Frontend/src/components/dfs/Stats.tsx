@@ -1,7 +1,7 @@
 const STATS = [
   { value: "10,000+", label: "Files distributed" },
   { value: "99.9%", label: "Uptime" },
-  { value: "256-bit", label: "AES encryption" },
+  { value: "AES-256", label: "Encrypted at rest" },
   { value: "<200ms", label: "Retrieval" },
 ];
 

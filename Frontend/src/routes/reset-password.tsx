@@ -13,6 +13,7 @@ import { Button } from "@/components/dfs/Button";
 import { PasswordField, PasswordStrength } from "@/components/dfs/Field";
 import { useDfs } from "@/lib/core/store";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/core/api";
 
 const title = "Set New Password — upLoader";
 const description = "Choose a new password for your upLoader account.";
@@ -60,8 +61,18 @@ function ResetPasswordPage() {
           </Link>
           <div className="mt-8">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
-              <svg className="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              <svg
+                className="h-8 w-8 text-red-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                />
               </svg>
             </div>
             <h1 className="mt-6 text-xl font-medium text-foreground">Invalid Reset Link</h1>
@@ -84,8 +95,8 @@ function ResetPasswordPage() {
     e.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
       return;
     }
     if (password !== confirm) {
@@ -98,8 +109,8 @@ function ResetPasswordPage() {
       await resetPassword(token, password);
       toast.success("Password reset successful! You're now logged in.");
       void navigate({ to: "/dashboard" });
-    } catch (err: any) {
-      setError(err?.message || "Invalid or expired reset link. Please request a new one.");
+    } catch (err) {
+      setError(errorMessage(err, "Invalid or expired reset link. Please request a new one."));
     } finally {
       setBusy(false);
     }
@@ -136,7 +147,10 @@ function ResetPasswordPage() {
                 required
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError(null);
+                }}
               />
               <PasswordStrength value={password} />
             </div>
@@ -145,7 +159,10 @@ function ResetPasswordPage() {
               required
               placeholder="••••••••"
               value={confirm}
-              onChange={(e) => { setConfirm(e.target.value); setError(null); }}
+              onChange={(e) => {
+                setConfirm(e.target.value);
+                setError(null);
+              }}
             />
           </div>
 
@@ -172,7 +189,10 @@ function ResetPasswordPage() {
         <div className="mt-7">
           <p className="text-center text-[14px] text-muted-foreground">
             Link expired?{" "}
-            <Link to="/forgot-password" className="text-foreground underline-offset-4 hover:underline">
+            <Link
+              to="/forgot-password"
+              className="text-foreground underline-offset-4 hover:underline"
+            >
               Request a new one
             </Link>
           </p>

@@ -29,16 +29,28 @@
 ## Dashboard redesign
 New sidebar with a **New** menu (New folder / Upload files / Upload folder), breadcrumbs with `?folder=<id>` URLs, folder cards, list/grid views, sort, `/` search across all folders, multi-select bulk download/delete, drop-anywhere overlay, floating upload tray, chunk-placement detail panel, live node health, mobile layout with a floating New button.
 
+## Fixed in the follow-up (login + encryption)
+| Area | Problem | Fix |
+|---|---|---|
+| Production | API calls relied on a `vercel.json` rewrite to a hard-coded Railway host. That host is gone, the rewrite isn't part of the Nitro/Vercel build output, and proxying would cap uploads at ~4.5 MB | Frontend calls `VITE_API_URL` directly; CORS allows `FRONTEND_URL` / `CORS_ORIGIN` / `CORS_ORIGIN_REGEX`; `vercel.json` removed — see DEPLOY.md |
+| Login UX | Every failure (server down, rate limit, …) showed "Invalid email or password" | Real server messages everywhere; "can't reach the server" banner on auth pages |
+| Gmail | Password/OTP logins stripped dots from Gmail addresses; Google sign-in kept them → OTP failed / duplicate accounts | Emails trimmed + lowercased only; legacy dot-stripped accounts still found |
+| Google | Client ID baked into the frontend build; invalid tokens and missing config → 500 | Client ID served by the API (`/api/auth/config`); 401 / 503 with clear messages; button hidden when not configured |
+| Email | SMTP blocked on many hosts (Railway below Pro); failures surfaced as 500 | Resend HTTPS API supported; clear 503; email-code tab hidden when email isn't configured |
+| Security | Google sign-in linked into unverified password accounts (pre-hijacking) | Linking an unverified account removes its password and revokes its sessions; email codes / reset links / Google mark addresses verified |
+| Security | Password reset didn't revoke existing sessions | `users.token_version` in every JWT; reset bumps it |
+| Limits | One limiter shared by "send code" and "check code"; 6-char passwords | Separate limiters; 8-char minimum |
+| Session | Stale/invalid session stayed "signed in" until the first API call | Session validated with `/api/auth/profile` on load |
+| Encryption | Advertised but didn't exist | AES-256-GCM per chunk at rest (random IV, file/position bound as AAD, tamper → parity rebuild); existing chunks migrated on boot or via `npm run encrypt:existing`; copy now says "encrypted at rest" |
+
 ## Still open (not changed)
-1. **Encryption is advertised but doesn't exist.** Landing page, Features, Stats, HowItWorks, meta tags all claim client-side AES-256. Either implement it (e.g. AES-256-GCM per chunk, key from env or per-user) or reword the copy.
-2. **"Distributed" nodes are three folders on one container.** On Railway the filesystem is ephemeral: every redeploy wipes all chunks unless a volume is mounted. Losing the container loses all three nodes at once.
-3. Downloads load the whole file into memory (server and browser); 100 MB cap per file. Streaming would need streaming checksum verification.
-4. Upload/download go through Vercel's external rewrite: body-size/time limits apply and all users share Vercel egress IPs for IP-based rate limits.
-5. Google sign-in auto-links to an existing password account with no email verification at sign-up (account pre-hijacking risk). Require email verification or confirm the link.
-6. Password reset doesn't revoke existing JWTs (add a `token_version` column).
-7. `vercel.json` rewrites everything to `/index.html`, but the frontend is a TanStack Start SSR build (default nitro target is Cloudflare Workers — see `.output/server/wrangler.json`).
-8. `last_heartbeat` updates whenever usage changes; there is no real node heartbeat.
-9. No tests in the repo (`npm test` exits 1).
+1. **"Distributed" nodes are three folders on one container.** Without a persistent volume every redeploy wipes all chunks, and losing the container loses all three nodes at once.
+2. Downloads load the whole file into memory (server and browser); 100 MB cap per file. Streaming would need streaming checksum verification.
+3. Encryption keys can't be rotated yet, and the server holds the key (at-rest, not end-to-end, encryption).
+4. Sign-up still doesn't send a verification email (accounts become verified via email code, reset link or Google).
+5. `last_heartbeat` updates whenever usage changes; there is no real node heartbeat.
+6. No tests in the repo (`npm test` exits 1). The verification scripts used for these changes could become the test suite.
+7. Landing-page stats ("10,000+ files", "99.9% uptime", "<200 ms") are placeholders, not measurements.
 
 ## Hosting alternatives
 The real constraint is **durable storage for chunks** — whichever host you choose, persist chunks somewhere that survives redeploys.

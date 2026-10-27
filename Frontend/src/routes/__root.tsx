@@ -91,7 +91,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Split, encrypted and distributed file storage. Upload once, retrieve from anywhere.",
+          "Split, encrypted-at-rest and distributed file storage. Upload once, retrieve from anywhere.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

@@ -1,6 +1,7 @@
 const fsp = require('fs/promises');
 const pool = require('../config/db');
 const chunkService = require('../services/chunkService');
+const cryptoService = require('../services/cryptoService');
 const storageService = require('../services/storageService');
 const folderService = require('../services/folderService');
 const logger = require('../utils/logger');
@@ -33,12 +34,15 @@ function serializeFile(f) {
         chunks: f.total_chunks,
         nodes: Number(f.nodes_used || 0),
         redundancy: '2+1 XOR parity',
+        // Every chunk encrypted at rest (false while legacy chunks await migration)
+        encrypted: f.total_chunks > 0 && Number(f.plain_chunks || 0) === 0,
     };
 }
 
 const FILE_SELECT = `
     SELECT f.*,
-        (SELECT COUNT(DISTINCT c.node_id) FROM chunks c WHERE c.file_id = f.id) AS nodes_used
+        (SELECT COUNT(DISTINCT c.node_id) FROM chunks c WHERE c.file_id = f.id) AS nodes_used,
+        (SELECT COUNT(*) FROM chunks c WHERE c.file_id = f.id AND c.encryption = 'none') AS plain_chunks
     FROM files f`;
 
 /** Remove a file's chunks from disk and its DB rows. Used for cleanup on failure. */
@@ -196,7 +200,9 @@ const fileController = {
                     node: c.node_name,
                     nodeStatus: c.node_status,
                     checksum: c.checksum,
-                    healthy: Boolean(stat && stat.size === c.chunk_size),
+                    encryption: c.encryption,
+                    // Encrypted chunks carry a 33-byte header + auth tag on disk
+                    healthy: Boolean(stat && stat.size === cryptoService.storedSize(c.chunk_size, c.encryption)),
                 };
             }));
 

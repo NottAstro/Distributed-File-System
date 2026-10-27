@@ -12,9 +12,11 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/dfs/Logo";
 import { Button } from "@/components/dfs/Button";
 import { Field, PasswordField, PasswordStrength } from "@/components/dfs/Field";
-import { GoogleSignInButton } from "@/components/dfs/GoogleSignInButton";
+import { GoogleSignInButton, useGoogleClientId } from "@/components/dfs/GoogleSignInButton";
+import { AuthServerNotice } from "@/components/dfs/AuthServerNotice";
 import { useDfs } from "@/lib/core/store";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/core/api";
 
 const title = "Create your upLoader account";
 const description =
@@ -35,6 +37,7 @@ export const Route = createFileRoute("/signup")({
 function SignUpPage() {
   const { signUp, googleSignIn, user } = useDfs();
   const navigate = useNavigate();
+  const googleClientId = useGoogleClientId();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,8 +54,8 @@ function SignUpPage() {
     try {
       await googleSignIn(credential);
       void navigate({ to: "/dashboard" });
-    } catch {
-      toast.error("Google sign-up failed. Please try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Google sign-up failed. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -85,25 +88,37 @@ function SignUpPage() {
           </p>
         </div>
 
-        {/* ── Google Sign-Up ── */}
-        <div className="mt-8">
-          <GoogleSignInButton
-            onCredential={handleGoogleCredential}
-            disabled={busy}
-            text="signup_with"
-          />
-        </div>
+        <AuthServerNotice />
 
-        {/* ── Divider ── */}
-        <div className="my-6 flex items-center gap-4">
-          <span className="h-px flex-1 bg-border" />
-          <span className="font-mono text-[12px] text-faint">or sign up with email</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
+        {/* ── Google Sign-Up (only when the server has it configured) ── */}
+        {googleClientId ? (
+          <>
+            <div className="mt-8">
+              <GoogleSignInButton
+                onCredential={handleGoogleCredential}
+                disabled={busy}
+                text="signup_with"
+              />
+            </div>
+
+            {/* ── Divider ── */}
+            <div className="my-6 flex items-center gap-4">
+              <span className="h-px flex-1 bg-border" />
+              <span className="font-mono text-[12px] text-faint">or sign up with email</span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        ) : (
+          <div className="mt-8" />
+        )}
 
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            if (password.length < 8) {
+              toast.error("Password must be at least 8 characters");
+              return;
+            }
             if (password !== confirm) {
               toast.error("Passwords do not match");
               return;
@@ -112,8 +127,8 @@ function SignUpPage() {
             try {
               await signUp(name, email, password);
               void navigate({ to: "/dashboard" });
-            } catch {
-              toast.error("Could not create account");
+            } catch (e) {
+              toast.error(errorMessage(e, "Could not create account"));
             } finally {
               setBusy(false);
             }
@@ -154,7 +169,14 @@ function SignUpPage() {
             />
           </div>
 
-          <Button variant="authSubmit" type="submit" size="lg" full className="mt-6" disabled={busy}>
+          <Button
+            variant="authSubmit"
+            type="submit"
+            size="lg"
+            full
+            className="mt-6"
+            disabled={busy}
+          >
             {busy ? "Creating account…" : "Create Account"}
           </Button>
         </form>

@@ -13,6 +13,8 @@ import { Button } from "@/components/dfs/Button";
 import { Field } from "@/components/dfs/Field";
 import { useDfs } from "@/lib/core/store";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/core/api";
+import { AuthServerNotice } from "@/components/dfs/AuthServerNotice";
 
 const title = "Forgot Password — upLoader";
 const description = "Reset your upLoader password via email.";
@@ -30,7 +32,7 @@ export const Route = createFileRoute("/forgot-password")({
 });
 
 function ForgotPasswordPage() {
-  const { forgotPassword } = useDfs();
+  const { forgotPassword, authConfig } = useDfs();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -52,8 +54,8 @@ function ForgotPasswordPage() {
       await forgotPassword(email);
       setSent(true);
       setCooldown(60);
-    } catch {
-      toast.error("Something went wrong. Please try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Something went wrong. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -83,6 +85,14 @@ function ForgotPasswordPage() {
               : "Enter your email and we'll send a reset link"}
           </p>
         </div>
+
+        <AuthServerNotice />
+        {authConfig && !authConfig.emailEnabled && (
+          <p className="mt-6 rounded-lg border border-[rgba(251,191,36,0.25)] bg-[rgba(251,191,36,0.06)] px-3 py-2.5 text-[13px] text-amber">
+            This server can't send email right now, so reset links aren't available. If you signed
+            up with Google, sign in with Google instead.
+          </p>
+        )}
 
         {!sent ? (
           /* ── Email form ── */
@@ -132,9 +142,7 @@ function ForgotPasswordPage() {
             </div>
 
             <div className="text-center">
-              <p className="text-[14px] text-[var(--ak-moon)]">
-                We sent a reset link to
-              </p>
+              <p className="text-[14px] text-[var(--ak-moon)]">We sent a reset link to</p>
               <p className="mt-1 text-[14px] font-medium text-foreground">{email}</p>
               <p className="mt-3 text-[13px] text-faint">
                 The link expires in 15 minutes. Check your spam folder if you don't see it.

@@ -13,7 +13,7 @@ const logger = require('../utils/logger');
  * - 5-minute expiry window
  * - Max 5 verification attempts per code (prevents brute-force)
  * - Old codes for same email are deleted when new one is generated
- * - Codes are 6 digits (000000–999999)
+ * - Codes are 6 digits (000000–999999, uniformly random)
  */
 
 const OTP_EXPIRY_MINUTES = 5;
@@ -30,7 +30,7 @@ const otpService = {
      */
     async generateAndStore(email, purpose = 'login') {
         // Generate cryptographically secure 6-digit code
-        const code = crypto.randomInt(100000, 999999).toString();
+        const code = crypto.randomInt(0, 1000000).toString().padStart(6, '0');
 
         // Hash the code before storing (same approach as passwords)
         const salt = await bcrypt.genSalt(10);
@@ -75,7 +75,7 @@ const otpService = {
         );
 
         if (rows.length === 0) {
-            return { valid: false, reason: 'No valid OTP found. Please request a new code.' };
+            return { valid: false, reason: 'That code is invalid or has expired. Please request a new one.' };
         }
 
         const otp = rows[0];

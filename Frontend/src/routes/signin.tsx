@@ -14,10 +14,12 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/dfs/Logo";
 import { Button } from "@/components/dfs/Button";
 import { Field, PasswordField } from "@/components/dfs/Field";
-import { GoogleSignInButton } from "@/components/dfs/GoogleSignInButton";
+import { GoogleSignInButton, useGoogleClientId } from "@/components/dfs/GoogleSignInButton";
+import { AuthServerNotice } from "@/components/dfs/AuthServerNotice";
 import { OtpInput } from "@/components/dfs/OtpInput";
 import { useDfs } from "@/lib/core/store";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/core/api";
 
 const title = "Sign in — upLoader";
 const description = "Sign in to access your distributed files on upLoader.";
@@ -37,8 +39,11 @@ export const Route = createFileRoute("/signin")({
 type AuthTab = "password" | "otp";
 
 function SignInPage() {
-  const { signIn, googleSignIn, otpRequest, otpVerify, user } = useDfs();
+  const { signIn, googleSignIn, otpRequest, otpVerify, user, authConfig } = useDfs();
   const navigate = useNavigate();
+  const googleClientId = useGoogleClientId();
+  // Until the config loads, assume email codes work (the server still says no if not)
+  const emailEnabled = authConfig?.emailEnabled ?? true;
 
   // Shared state
   const [tab, setTab] = useState<AuthTab>("password");
@@ -61,8 +66,8 @@ function SignInPage() {
     try {
       await googleSignIn(credential);
       void navigate({ to: "/dashboard" });
-    } catch {
-      toast.error("Google sign-in failed. Please try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Google sign-in failed. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -79,8 +84,8 @@ function SignInPage() {
       await otpRequest(email);
       setOtpSent(true);
       toast.success("Login code sent! Check your email.");
-    } catch {
-      toast.error("Could not send login code. Try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Could not send login code. Try again."));
     } finally {
       setBusy(false);
     }
@@ -92,8 +97,8 @@ function SignInPage() {
     try {
       await otpVerify(email, code);
       void navigate({ to: "/dashboard" });
-    } catch {
-      toast.error("Invalid or expired code. Try again.");
+    } catch (e) {
+      toast.error(errorMessage(e, "Invalid or expired code. Try again."));
     } finally {
       setBusy(false);
     }
@@ -127,43 +132,56 @@ function SignInPage() {
           </p>
         </div>
 
-        {/* ── Google Sign-In ── */}
-        <div className="mt-8">
-          <GoogleSignInButton onCredential={handleGoogleCredential} disabled={busy} />
-        </div>
+        <AuthServerNotice />
 
-        {/* ── Divider ── */}
-        <div className="my-6 flex items-center gap-4">
-          <span className="h-px flex-1 bg-border" />
-          <span className="font-mono text-[12px] text-faint">or continue with email</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
+        {/* ── Google Sign-In (only when the server has it configured) ── */}
+        {googleClientId ? (
+          <>
+            <div className="mt-8">
+              <GoogleSignInButton onCredential={handleGoogleCredential} disabled={busy} />
+            </div>
 
-        {/* ── Tab switcher ── */}
-        <div className="mb-6 flex rounded-lg border border-[var(--ak-glass-border)] bg-[var(--ak-glass)] p-1">
-          <button
-            type="button"
-            onClick={() => { setTab("password"); setOtpSent(false); }}
-            className={`flex-1 rounded-md px-3 py-2 text-[13px] font-medium transition-all duration-200 ${
-              tab === "password"
-                ? "bg-[#818cf8]/15 text-[#818cf8] shadow-sm"
-                : "text-faint hover:text-foreground"
-            }`}
-          >
-            Password
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("otp")}
-            className={`flex-1 rounded-md px-3 py-2 text-[13px] font-medium transition-all duration-200 ${
-              tab === "otp"
-                ? "bg-[#818cf8]/15 text-[#818cf8] shadow-sm"
-                : "text-faint hover:text-foreground"
-            }`}
-          >
-            Email Code
-          </button>
-        </div>
+            {/* ── Divider ── */}
+            <div className="my-6 flex items-center gap-4">
+              <span className="h-px flex-1 bg-border" />
+              <span className="font-mono text-[12px] text-faint">or continue with email</span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        ) : (
+          <div className="mt-8" />
+        )}
+
+        {/* ── Tab switcher (email codes need working email delivery) ── */}
+        {emailEnabled && (
+          <div className="mb-6 flex rounded-lg border border-[var(--ak-glass-border)] bg-[var(--ak-glass)] p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setTab("password");
+                setOtpSent(false);
+              }}
+              className={`flex-1 rounded-md px-3 py-2 text-[13px] font-medium transition-all duration-200 ${
+                tab === "password"
+                  ? "bg-[#818cf8]/15 text-[#818cf8] shadow-sm"
+                  : "text-faint hover:text-foreground"
+              }`}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("otp")}
+              className={`flex-1 rounded-md px-3 py-2 text-[13px] font-medium transition-all duration-200 ${
+                tab === "otp"
+                  ? "bg-[#818cf8]/15 text-[#818cf8] shadow-sm"
+                  : "text-faint hover:text-foreground"
+              }`}
+            >
+              Email Code
+            </button>
+          </div>
+        )}
 
         {/* ── Password Tab ── */}
         {tab === "password" && (
@@ -174,8 +192,8 @@ function SignInPage() {
               try {
                 await signIn(email, password);
                 void navigate({ to: "/dashboard" });
-              } catch {
-                toast.error("Invalid email or password");
+              } catch (e) {
+                toast.error(errorMessage(e, "Invalid email or password"));
               } finally {
                 setBusy(false);
               }
@@ -207,14 +225,21 @@ function SignInPage() {
               </div>
             </div>
 
-            <Button variant="authSubmit" type="submit" size="lg" full className="mt-6" disabled={busy}>
+            <Button
+              variant="authSubmit"
+              type="submit"
+              size="lg"
+              full
+              className="mt-6"
+              disabled={busy}
+            >
               {busy ? "Signing in…" : "Sign In"}
             </Button>
           </form>
         )}
 
         {/* ── OTP Tab ── */}
-        {tab === "otp" && (
+        {tab === "otp" && emailEnabled && (
           <div>
             {!otpSent ? (
               /* Step 1: Enter email → Send OTP */
@@ -242,9 +267,7 @@ function SignInPage() {
               /* Step 2: Enter OTP code */
               <div className="space-y-5">
                 <div className="text-center">
-                  <p className="text-[14px] text-[var(--ak-moon)]">
-                    We sent a 6-digit code to
-                  </p>
+                  <p className="text-[14px] text-[var(--ak-moon)]">We sent a 6-digit code to</p>
                   <p className="mt-1 text-[14px] font-medium text-foreground">{email}</p>
                 </div>
 
